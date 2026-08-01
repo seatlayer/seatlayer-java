@@ -253,6 +253,7 @@ Full reference: [docs.seatlayer.io/server-sdk](https://docs.seatlayer.io/server-
 | Node.js (server) | [`@seatlayer/server`](https://github.com/seatlayer/seatlayer-node) |
 | Python (server) | [`seatlayer`](https://github.com/seatlayer/seatlayer-python) |
 | PHP (server) | [`seatlayer/seatlayer-php`](https://github.com/seatlayer/seatlayer-php) |
+| Go (server) | [`github.com/seatlayer/seatlayer-go`](https://github.com/seatlayer/seatlayer-go) |
 
 ## Development
 
