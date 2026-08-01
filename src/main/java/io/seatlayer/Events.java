@@ -1,0 +1,111 @@
+package io.seatlayer;
+
+import static io.seatlayer.SeatLayerHttpClient.body;
+import static io.seatlayer.SeatLayerHttpClient.encode;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/** Event lifecycle, metadata, reports. */
+public final class Events {
+
+    private final SeatLayerHttpClient http;
+
+    Events(SeatLayerHttpClient http) {
+        this.http = http;
+    }
+
+    /**
+     * One page of events.
+     *
+     * <p>Live availability counts cost one round-trip per event server-side. They are on
+     * by default because most callers of a single page want them; turn them off when
+     * paging a whole catalogue, where you almost certainly do not.
+     */
+    public Page<Map<String, Object>> list(EventListOptions options) {
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put("workspaceId", options.workspaceId());
+        query.put("externalRef", options.externalRef());
+        query.put("limit", options.limit());
+        query.put("cursor", options.cursor());
+        if (!options.counts()) {
+            query.put("counts", "0");
+        }
+        return Page.of(http.get("/v1/events", query), "events");
+    }
+
+    public Page<Map<String, Object>> list() {
+        return list(EventListOptions.builder().build());
+    }
+
+    /**
+     * Every event, paging transparently. Counts default off here — you are walking the
+     * whole list, so per-event availability is rarely what you want and always what it
+     * costs.
+     */
+    public Iterable<Map<String, Object>> listAll(EventListOptions options) {
+        return Page.paginate(cursor -> list(options.withCursor(cursor)));
+    }
+
+    public Iterable<Map<String, Object>> listAll() {
+        return listAll(EventListOptions.builder().counts(false).build());
+    }
+
+    public Map<String, Object> create(String chartId) {
+        return http.post("/v1/events", body("chartId", chartId));
+    }
+
+    public Map<String, Object> create(String chartId, String name) {
+        return http.post("/v1/events", body("chartId", chartId, "name", name));
+    }
+
+    public Map<String, Object> create(Map<String, Object> params, String idempotencyKey) {
+        return http.post("/v1/events", params, idempotencyKey);
+    }
+
+    public Map<String, Object> retrieve(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey));
+    }
+
+    public Map<String, Object> update(String eventKey, Map<String, Object> fields) {
+        return http.patch("/v1/events/" + encode(eventKey), fields);
+    }
+
+    public Map<String, Object> delete(String eventKey) {
+        return http.delete("/v1/events/" + encode(eventKey));
+    }
+
+    /** Move a live event onto the latest published version of its chart. */
+    public Map<String, Object> updateChart(String eventKey) {
+        return http.post("/v1/events/" + encode(eventKey) + "/update-chart");
+    }
+
+    /** Stop buyer sales. Existing holds keep their TTL. */
+    public Map<String, Object> close(String eventKey) {
+        return http.post("/v1/events/" + encode(eventKey) + "/close");
+    }
+
+    public Map<String, Object> reopen(String eventKey) {
+        return http.post("/v1/events/" + encode(eventKey) + "/reopen");
+    }
+
+    public Map<String, Object> archive(String eventKey) {
+        return http.post("/v1/events/" + encode(eventKey) + "/archive");
+    }
+
+    public Map<String, Object> retrieveHoldTtl(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey) + "/hold-ttl");
+    }
+
+    public Map<String, Object> updateHoldTtl(String eventKey, long holdTtlMs) {
+        return http.post("/v1/events/" + encode(eventKey) + "/hold-ttl", body("holdTtlMs", holdTtlMs));
+    }
+
+    public Map<String, Object> retrieveReport(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey) + "/report");
+    }
+
+    public Map<String, Object> retrieveLog(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey) + "/log");
+    }
+}
