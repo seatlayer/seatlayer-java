@@ -263,6 +263,9 @@ Full reference: [docs.seatlayer.io/server-sdk](https://docs.seatlayer.io/server-
 mvn verify   # compile, test, and build the main/sources/javadoc jars
 ```
 
+Publishing to Maven Central is documented in [RELEASE.md](RELEASE.md). Signing lives in a
+`release` profile, so an ordinary `mvn verify` needs no GPG key.
+
 ## License
 
 MIT

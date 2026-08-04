@@ -21,6 +21,14 @@ be usable from a browser.
 `mvn verify` compiles, tests, and builds the main/sources/javadoc jars Maven Central requires.
 CI runs it on Java 17 and 21.
 
+Javadoc runs under `-Xdoclint:all,-missing` and `failOnError`, because Central rejects a
+release whose javadoc does not build. Malformed tags and broken `@link` targets fail the
+build here rather than at submission — do not relax that to get a commit through.
+
+Release mechanics (signing, namespace, the publish command) are in `RELEASE.md`. Signing is
+in a `release` profile so a normal build needs no GPG key; never move it into the default
+build, and never put a token or passphrase in this repo.
+
 ## The JSON codec
 
 `Json.java` exists so the SDK has no dependencies. It is small but load-bearing — every request

@@ -39,6 +39,10 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <!-- Fixed timestamp makes the jars byte-for-byte reproducible, so a rebuild
+         of a released tag can be diffed against what is on Central. -->
+    <project.build.outputTimestamp>2026-08-04T00:00:00Z</project.build.outputTimestamp>
     <junit.version>5.11.4</junit.version>
   </properties>
 
@@ -60,6 +64,18 @@
   </dependencies>
 
   <build>
+    <!-- Ship the licence inside the jar, so the terms travel with the artifact
+         rather than only with the GitHub repo. -->
+    <resources>
+      <resource>
+        <directory>${project.basedir}</directory>
+        <targetPath>META-INF</targetPath>
+        <includes>
+          <include>LICENSE</include>
+        </includes>
+      </resource>
+    </resources>
+
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -81,6 +97,18 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
         <version>3.11.2</version>
+        <configuration>
+          <!-- Central rejects a release whose javadoc does not build, and the
+               doclint groups that are fatal have changed between JDK releases.
+               Pin them: `all,-missing` keeps the checks that catch genuinely
+               broken javadoc (malformed tags, bad @link targets, invalid HTML)
+               and drops only "this member has no comment", which is a style
+               opinion and must never fail a release build. CI runs 17 and 21;
+               the publish may well happen on something newer. -->
+          <doclint>all,-missing</doclint>
+          <failOnError>true</failOnError>
+          <quiet>true</quiet>
+        </configuration>
         <executions>
           <execution>
             <id>attach-javadocs</id>
@@ -88,6 +116,74 @@
           </execution>
         </executions>
       </plugin>
+
+      <!--
+        The publish path. Sonatype's Central Portal is the only way in for a
+        namespace registered today; the old OSSRH/nexus-staging route is closed
+        to new projects. `extensions=true` makes this the deploy handler, so
+        `mvn deploy` uploads a bundle here instead of looking for a
+        distributionManagement repository.
+      -->
+      <plugin>
+        <groupId>org.sonatype.central</groupId>
+        <artifactId>central-publishing-maven-plugin</artifactId>
+        <version>0.7.0</version>
+        <extensions>true</extensions>
+        <configuration>
+          <!-- Must match a <server><id> in ~/.m2/settings.xml. -->
+          <publishingServerId>central</publishingServerId>
+          <!--
+            Deliberately NOT auto-publishing. The upload lands in the Portal as a
+            VALIDATED deployment and waits for a human to press Publish. That is
+            the last reversible moment: a deployment can be dropped, but once
+            published a version is on Central permanently and can never be
+            replaced or deleted. See RELEASE.md.
+          -->
+          <autoPublish>false</autoPublish>
+          <!-- Block until Central has finished validating, so `mvn deploy`
+               reports rejections instead of exiting 0 on an upload that later
+               fails out of band. -->
+          <waitUntil>validated</waitUntil>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <!--
+      Signing lives in a profile so an ordinary `mvn verify` needs no GPG key.
+      Central rejects any artifact without a detached .asc signature, so the
+      release command must carry -Prelease; RELEASE.md spells that out and the
+      pre-flight check there proves the .asc files exist before uploading.
+    -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>3.2.7</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+                <configuration>
+                  <!-- Key and passphrase come from settings.xml properties or
+                       the environment (MAVEN_GPG_KEY / MAVEN_GPG_PASSPHRASE),
+                       never from this file. Loopback pinentry is what lets gpg
+                       take the passphrase non-interactively on gpg 2.1+. -->
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
