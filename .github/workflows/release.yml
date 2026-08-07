@@ -7,16 +7,19 @@ name: Release
 # real stored secrets. Doppler (project seatlayer-release, config prd) is the
 # source of truth; these are operational copies pushed into Actions secrets.
 #
-# This workflow UPLOADS BUT DOES NOT PUBLISH. pom.xml sets
-# <autoPublish>false</autoPublish>, so the deployment lands in the Portal as
-# VALIDATED and waits for a human to press Publish. That is deliberate and is
-# the last reversible moment: a deployment can be dropped, but a published
-# version is on Central permanently — it can never be replaced or deleted.
+# This workflow PUBLISHES. pom.xml sets <autoPublish>true</autoPublish>, so a
+# tag push goes all the way to Central with no human step.
 #
-# To release: push a tag matching <version> in pom.xml, then press Publish in
-# the Portal once the deployment shows validated.
+# That makes the gate below the last line of defence. Central is the only
+# registry in this fleet where a published version can never be replaced or
+# deleted, and there is no longer a validated-deployment stage where a bad build
+# could be dropped. The test suite, the tag-vs-<version> check and GPG signing
+# all run before the upload; if any fails, nothing is sent. Do not weaken them.
 #
-#     git tag v0.1.0 && git push origin v0.1.0
+# To release: push a tag matching <version> in pom.xml. That is the whole
+# procedure, and it is irreversible.
+#
+#     git tag v0.2.0 && git push origin v0.2.0
 
 on:
   push:
@@ -73,6 +76,8 @@ jobs:
 
       - name: Where this landed
         run: |
-          echo "Uploaded and validated — NOT yet published."
-          echo "Press Publish at https://central.sonatype.com/publishing/deployments"
-          echo "to make io.seatlayer:seatlayer-java:${GITHUB_REF_NAME#v} permanent."
+          v="${GITHUB_REF_NAME#v}"
+          echo "PUBLISHED to Maven Central: io.seatlayer:seatlayer-java:$v"
+          echo "This is permanent — Central versions cannot be replaced or deleted."
+          echo "https://repo1.maven.org/maven2/io/seatlayer/seatlayer-java/$v/"
+          echo "Search indexing lags publication by roughly 15-30 minutes."

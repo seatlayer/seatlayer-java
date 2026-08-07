@@ -136,17 +136,33 @@
           <!-- Must match a <server><id> in ~/.m2/settings.xml. -->
           <publishingServerId>central</publishingServerId>
           <!--
-            Deliberately NOT auto-publishing. The upload lands in the Portal as a
-            VALIDATED deployment and waits for a human to press Publish. That is
-            the last reversible moment: a deployment can be dropped, but once
-            published a version is on Central permanently and can never be
-            replaced or deleted. See RELEASE.md.
+            Auto-publish: a tag push goes all the way to Central with no human
+            step (owner decision, 2026-08-07).
+
+            Know what this gives up. Central is the ONLY registry in this fleet
+            where a published version can never be replaced or deleted — PyPI and
+            RubyGems allow a yank, NuGet an unlist, Packagist republishes from
+            tags. `false` used to hold the deployment in the Portal as the last
+            moment a bad build could be dropped; that moment no longer exists.
+
+            What stands in its place is the release workflow's gate: the full
+            test suite, a tag-vs-<version> equality check, and GPG signing all
+            run BEFORE the upload, and any failure means nothing is sent. Those
+            checks are now the only thing between a tag and a permanent artifact,
+            so treat them as load-bearing and do not weaken them.
+
+            To go back: set this to false and publishing waits for a human at
+            https://central.sonatype.com/publishing/deployments
           -->
-          <autoPublish>false</autoPublish>
-          <!-- Block until Central has finished validating, so `mvn deploy`
-               reports rejections instead of exiting 0 on an upload that later
-               fails out of band. -->
-          <waitUntil>validated</waitUntil>
+          <autoPublish>true</autoPublish>
+          <!--
+            `published`, not `validated`. With autoPublish on, stopping at
+            validated would let `mvn deploy` exit 0 while the publish is still in
+            flight — a failure after that point would never reach the build log.
+            Blocking until published means the workflow's result is the real
+            outcome rather than a promise of one.
+          -->
+          <waitUntil>published</waitUntil>
         </configuration>
       </plugin>
     </plugins>
