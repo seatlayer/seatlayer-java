@@ -1,0 +1,78 @@
+name: Release
+
+# Uploads to Maven Central via the Central Portal.
+#
+# Unlike the other five registries in this fleet, Central has NO Trusted
+# Publishing — there is no OIDC path, so this is the one workflow that needs
+# real stored secrets. Doppler (project seatlayer-release, config prd) is the
+# source of truth; these are operational copies pushed into Actions secrets.
+#
+# This workflow UPLOADS BUT DOES NOT PUBLISH. pom.xml sets
+# <autoPublish>false</autoPublish>, so the deployment lands in the Portal as
+# VALIDATED and waits for a human to press Publish. That is deliberate and is
+# the last reversible moment: a deployment can be dropped, but a published
+# version is on Central permanently — it can never be replaced or deleted.
+#
+# To release: push a tag matching <version> in pom.xml, then press Publish in
+# the Portal once the deployment shows validated.
+#
+#     git tag v0.1.0 && git push origin v0.1.0
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: maven-central
+      url: https://central.sonatype.com/publishing/deployments
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: temurin
+          cache: maven
+          # Writes ~/.m2/settings.xml with <server><id>central</id>, matching
+          # <publishingServerId>central</publishingServerId> in pom.xml. These
+          # two names must agree or the upload 401s.
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          # Imports the private key into the runner's keyring so maven-gpg-plugin
+          # can produce the detached .asc signatures Central requires.
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Gate
+        run: mvn -B verify
+
+      - name: Refuse to publish if the tag and pom version disagree
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          ver="$(mvn -B -q help:evaluate -Dexpression=project.version -DforceStdout)"
+          if [ "$tag" != "$ver" ]; then
+            echo "::error::tag v$tag does not match pom version $ver"
+            exit 1
+          fi
+
+      - name: Deploy to the Central Portal
+        # -Prelease activates the signing profile. Central rejects any artifact
+        # without a detached .asc, and an ordinary `mvn deploy` would upload
+        # unsigned and be refused.
+        run: mvn -B -Prelease deploy
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+
+      - name: Where this landed
+        run: |
+          echo "Uploaded and validated — NOT yet published."
+          echo "Press Publish at https://central.sonatype.com/publishing/deployments"
+          echo "to make io.seatlayer:seatlayer-java:${GITHUB_REF_NAME#v} permanent."
