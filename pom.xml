@@ -127,7 +127,10 @@
       <plugin>
         <groupId>org.sonatype.central</groupId>
         <artifactId>central-publishing-maven-plugin</artifactId>
-        <version>0.7.0</version>
+        <!-- 0.7.0 could not parse the Portal's response: Central's API grew a
+             "warnings" field that the old model rejected outright, so an upload
+             that SUCCEEDED still failed the build on deserialisation. -->
+        <version>0.11.0</version>
         <extensions>true</extensions>
         <configuration>
           <!-- Must match a <server><id> in ~/.m2/settings.xml. -->
