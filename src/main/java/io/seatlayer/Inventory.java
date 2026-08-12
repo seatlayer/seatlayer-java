@@ -39,6 +39,25 @@ public final class Inventory {
         return http.post(path(eventKey, "/hold"), body("labels", labels, "ttlMs", ttlMs), idempotencyKey);
     }
 
+    public Map<String, Object> hold(
+            String eventKey,
+            List<String> labels,
+            Long ttlMs,
+            String idempotencyKey,
+            List<String> channelIds,
+            Boolean ignoreChannelRestrictions,
+            String reason) {
+        return http.post(
+                path(eventKey, "/hold"),
+                body(
+                        "labels", labels,
+                        "ttlMs", ttlMs,
+                        "channelIds", channelIds,
+                        "ignoreChannelRestrictions", ignoreChannelRestrictions,
+                        "reason", reason),
+                idempotencyKey);
+    }
+
     /**
      * Ask us to pick the best free objects and hold them.
      *
@@ -58,6 +77,29 @@ public final class Inventory {
                 idempotencyKey);
     }
 
+    public Map<String, Object> holdBestAvailable(
+            String eventKey,
+            int qty,
+            String categoryKey,
+            String zoneId,
+            Long ttlMs,
+            String idempotencyKey,
+            List<String> channelIds,
+            Boolean ignoreChannelRestrictions,
+            String reason) {
+        return http.post(
+                path(eventKey, "/best-available"),
+                body(
+                        "qty", qty,
+                        "categoryKey", categoryKey,
+                        "zoneId", zoneId,
+                        "ttlMs", ttlMs,
+                        "channelIds", channelIds,
+                        "ignoreChannelRestrictions", ignoreChannelRestrictions,
+                        "reason", reason),
+                idempotencyKey);
+    }
+
     /**
      * Pick and book in one call — the box-office shape.
      *
@@ -65,14 +107,38 @@ public final class Inventory {
      * two calls would strand inventory until the TTL expired.
      */
     public Map<String, Object> bookBestAvailable(String eventKey, int qty, String bookingRef) {
-        return http.post(path(eventKey, "/best-available-book"), body("qty", qty, "bookingRef", bookingRef));
+        return http.post(
+                path(eventKey, "/best-available-book"), body("qty", qty, "bookingRef", bookingRef(bookingRef)));
     }
 
     public Map<String, Object> bookBestAvailable(
             String eventKey, int qty, String bookingRef, String categoryKey, String zoneId, String idempotencyKey) {
         return http.post(
                 path(eventKey, "/best-available-book"),
-                body("qty", qty, "bookingRef", bookingRef, "categoryKey", categoryKey, "zoneId", zoneId),
+                body("qty", qty, "bookingRef", bookingRef(bookingRef), "categoryKey", categoryKey, "zoneId", zoneId),
+                idempotencyKey);
+    }
+
+    public Map<String, Object> bookBestAvailable(
+            String eventKey,
+            int qty,
+            String bookingRef,
+            String categoryKey,
+            String zoneId,
+            String idempotencyKey,
+            List<String> channelIds,
+            Boolean ignoreChannelRestrictions,
+            String reason) {
+        return http.post(
+                path(eventKey, "/best-available-book"),
+                body(
+                        "qty", qty,
+                        "bookingRef", bookingRef(bookingRef),
+                        "categoryKey", categoryKey,
+                        "zoneId", zoneId,
+                        "channelIds", channelIds,
+                        "ignoreChannelRestrictions", ignoreChannelRestrictions,
+                        "reason", reason),
                 idempotencyKey);
     }
 
@@ -102,20 +168,60 @@ public final class Inventory {
     }
 
     public Map<String, Object> book(String eventKey, String holdId, String bookingRef) {
-        return http.post(path(eventKey, "/book"), body("holdId", holdId, "bookingRef", bookingRef));
+        return http.post(path(eventKey, "/book"), body("holdId", holdId, "bookingRef", bookingRef(bookingRef)));
+    }
+
+    public Map<String, Object> book(
+            String eventKey,
+            String holdId,
+            String bookingRef,
+            List<String> channelIds,
+            Boolean ignoreChannelRestrictions,
+            String reason,
+            String idempotencyKey) {
+        return http.post(
+                path(eventKey, "/book"),
+                body(
+                        "holdId", holdId,
+                        "bookingRef", bookingRef(bookingRef),
+                        "channelIds", channelIds,
+                        "ignoreChannelRestrictions", ignoreChannelRestrictions,
+                        "reason", reason),
+                idempotencyKey);
     }
 
     public Map<String, Object> bookLabels(String eventKey, List<String> labels, String bookingRef) {
-        return http.post(path(eventKey, "/book"), body("labels", labels, "bookingRef", bookingRef));
+        return http.post(path(eventKey, "/book"), body("labels", labels, "bookingRef", bookingRef(bookingRef)));
+    }
+
+    public Map<String, Object> bookLabels(
+            String eventKey,
+            List<String> labels,
+            String bookingRef,
+            List<String> channelIds,
+            Boolean ignoreChannelRestrictions,
+            String reason,
+            String idempotencyKey) {
+        return http.post(
+                path(eventKey, "/book"),
+                body(
+                        "labels", labels,
+                        "bookingRef", bookingRef(bookingRef),
+                        "channelIds", channelIds,
+                        "ignoreChannelRestrictions", ignoreChannelRestrictions,
+                        "reason", reason),
+                idempotencyKey);
     }
 
     public Map<String, Object> boxOfficeBook(String eventKey, List<String> labels, String bookingRef) {
-        return http.post(path(eventKey, "/box-book"), body("labels", labels, "bookingRef", bookingRef));
+        return http.post(
+                path(eventKey, "/box-book"), body("labels", labels, "bookingRef", bookingRef(bookingRef)));
     }
 
     /** Reverse a booking. Requires a key with cancel authority. */
-    public Map<String, Object> unbook(String eventKey, List<String> labels) {
-        return http.post(path(eventKey, "/unbook"), body("labels", labels));
+    public Map<String, Object> unbook(String eventKey, List<String> labels, String bookingRef) {
+        return http.post(
+                path(eventKey, "/unbook"), body("labels", labels, "bookingRef", bookingRef(bookingRef)));
     }
 
     /** Hold inventory back from sale (house seats, production holds). */
@@ -137,5 +243,27 @@ public final class Inventory {
 
     public Map<String, Object> updateAvailability(String eventKey, Map<String, Object> fields) {
         return http.post(path(eventKey, "/availability"), fields);
+    }
+
+    /** One page of booking lifecycle records, newest first. */
+    public Map<String, Object> listBookings(
+            String eventKey, String query, String state, Integer limit, String cursor) {
+        return http.get(
+                path(eventKey, "/bookings"),
+                body("q", query, "state", state, "limit", limit, "cursor", cursor));
+    }
+
+    /** Retrieves a booking lifecycle by its stable reference. */
+    public Map<String, Object> retrieveBooking(String eventKey, String bookingRef) {
+        return http.get(path(eventKey, "/bookings/" + encode(bookingRef(bookingRef))));
+    }
+
+    private static String bookingRef(String value) {
+        String normalized = value == null ? "" : value.trim();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "bookingRef is required and must be a non-empty stable reference");
+        }
+        return normalized;
     }
 }

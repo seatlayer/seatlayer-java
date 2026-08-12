@@ -18,6 +18,7 @@ public final class SeatLayer {
 
     private final SeatLayerHttpClient http;
     private final Charts charts;
+    private final Channels channels;
     private final Events events;
     private final Inventory inventory;
     private final Sessions sessions;
@@ -32,6 +33,7 @@ public final class SeatLayer {
         this.http = new SeatLayerHttpClient(
                 builder.secretKey, builder.baseUrl, builder.maxRetries, builder.timeout, builder.transport);
         this.charts = new Charts(http);
+        this.channels = new Channels(http);
         this.events = new Events(http);
         this.inventory = new Inventory(http);
         this.sessions = new Sessions(http);
@@ -45,6 +47,11 @@ public final class SeatLayer {
 
     public Charts charts() {
         return charts;
+    }
+
+    /** Private allocations, reporting, and origin-bound buyer access. */
+    public Channels channels() {
+        return channels;
     }
 
     public Events events() {

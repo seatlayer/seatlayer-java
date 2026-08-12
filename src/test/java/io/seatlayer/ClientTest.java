@@ -351,6 +351,72 @@ class ClientTest {
         }
 
         @Test
+        @DisplayName("a hold carries its channel authority and audit reason")
+        void holdCarriesChannelAuthority() {
+            SeatLayer sdk = client(List.of(Stub.of(200, "{\"holdId\":\"h_1\"}")));
+            sdk.inventory().hold(
+                    "ev_1",
+                    List.of("A-1"),
+                    null,
+                    "partner-order-42",
+                    List.of("ch_partner"),
+                    false,
+                    "partner checkout");
+
+            Map<String, Object> body = Json.readObject(call(0).body());
+            assertEquals(List.of("ch_partner"), body.get("channelIds"));
+            assertEquals(false, body.get("ignoreChannelRestrictions"));
+            assertEquals("partner checkout", body.get("reason"));
+        }
+
+        @Test
+        @DisplayName("buyer access is origin-bound and carries only requested channels")
+        void createsBuyerAccessSession() {
+            SeatLayer sdk = client(List.of(Stub.of(201, "{\"token\":\"bas_x\"}")));
+            sdk.channels().createBuyerAccessSession(
+                    "ev/1",
+                    false,
+                    "https://partner.example",
+                    List.of("ch_1"),
+                    null,
+                    4,
+                    null,
+                    null,
+                    null,
+                    "partner-order-42");
+
+            assertEquals(
+                    "https://api.seatlayer.io/v1/events/ev%2F1/buyer-access-sessions",
+                    call(0).url());
+            assertEquals("partner-order-42", call(0).headers().get("Idempotency-Key"));
+            Map<String, Object> body = Json.readObject(call(0).body());
+            assertEquals(false, body.get("includePublic"));
+            assertEquals("https://partner.example", body.get("allowedOrigin"));
+            assertEquals(List.of("ch_1"), body.get("channelIds"));
+        }
+
+        @Test
+        @DisplayName("booking references are trimmed and encoded as one path segment")
+        void retrievesEncodedBookingReference() {
+            SeatLayer sdk = client(List.of(Stub.of(200, "{\"bookingRef\":\"order / 42\"}")));
+            sdk.inventory().retrieveBooking("ev_1", "  order / 42  ");
+
+            assertEquals(
+                    "https://api.seatlayer.io/v1/events/ev_1/bookings/order%20%2F%2042",
+                    call(0).url());
+        }
+
+        @Test
+        @DisplayName("a blank booking reference fails before making a request")
+        void rejectsBlankBookingReference() {
+            SeatLayer sdk = client(List.of());
+            var error = assertThrows(
+                    IllegalArgumentException.class,
+                    () -> sdk.inventory().unbook("ev_1", List.of("A-1"), "   "));
+            assertTrue(error.getMessage().contains("bookingRef is required"));
+        }
+
+        @Test
         @DisplayName("a spent hold surfaces as a conflict, not a generic failure")
         void spentHoldIsConflict() {
             SeatLayer sdk = client(List.of(Stub.of(409, "{\"error\":\"cannot_extend\",\"reason\":\"expired\"}")));
