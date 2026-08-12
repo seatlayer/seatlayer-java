@@ -1,5 +1,9 @@
 # SeatLayer Java SDK
 
+[![CI](https://github.com/seatlayer/seatlayer-java/actions/workflows/ci.yml/badge.svg)](https://github.com/seatlayer/seatlayer-java/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/io.seatlayer/seatlayer-java.svg)](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java)
+[![License: MIT](https://img.shields.io/badge/license-MIT-111827.svg)](LICENSE)
+
 Official Java server SDK for the [SeatLayer](https://seatlayer.io) reserved-seating API.
 
 > **Server-side only.** This library authenticates with your secret key. Never ship it in an
