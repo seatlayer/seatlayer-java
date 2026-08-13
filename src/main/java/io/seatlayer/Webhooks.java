@@ -34,4 +34,11 @@ public final class Webhooks {
     public Map<String, Object> listDeliveries(String webhookId) {
         return http.get("/v1/webhooks/" + encode(webhookId) + "/deliveries");
     }
+
+    public Map<String, Object> listDeliveries(
+            String webhookId, Integer limit, String status, Long before) {
+        return http.get(
+                "/v1/webhooks/" + encode(webhookId) + "/deliveries",
+                body("limit", limit, "status", status, "before", before));
+    }
 }

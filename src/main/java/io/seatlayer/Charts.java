@@ -52,12 +52,12 @@ public final class Charts {
     }
 
     public Map<String, Object> create(String name) {
-        return http.post("/v1/charts", body("name", name));
+        return http.postWithHeaderReplay("/v1/charts", body("name", name));
     }
 
     public Map<String, Object> create(
             String name, Map<String, Object> doc, String externalRef, String workspaceId, String idempotencyKey) {
-        return http.post(
+        return http.postWithHeaderReplay(
                 "/v1/charts",
                 body("name", name, "doc", doc, "externalRef", externalRef, "workspaceId", workspaceId),
                 idempotencyKey);
@@ -83,13 +83,33 @@ public final class Charts {
                 "/v1/charts/" + encode(chartId), body("doc", doc, "expectedUpdatedAt", expectedUpdatedAt));
     }
 
+    /** Updates name, issues, or externalRef without replacing the chart document. */
+    public Map<String, Object> update(String chartId, Map<String, Object> fields) {
+        return http.put("/v1/charts/" + encode(chartId), fields);
+    }
+
     public Map<String, Object> delete(String chartId) {
         return http.delete("/v1/charts/" + encode(chartId));
     }
 
     /** Copy a chart — the usual way to provision a venue from a template. */
     public Map<String, Object> copy(String chartId) {
-        return http.post("/v1/charts/" + encode(chartId) + "/duplicate");
+        return http.postWithHeaderReplay("/v1/charts/" + encode(chartId) + "/duplicate");
+    }
+
+    public Map<String, Object> copy(
+            String chartId,
+            String name,
+            String externalRef,
+            String workspaceId,
+            String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                "/v1/charts/" + encode(chartId) + "/duplicate",
+                body(
+                        "name", name,
+                        "externalRef", externalRef,
+                        "workspaceId", workspaceId),
+                idempotencyKey);
     }
 
     public Map<String, Object> archive(String chartId) {

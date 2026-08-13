@@ -35,6 +35,11 @@ public final class Inventory {
         return http.post(path(eventKey, "/hold"), body("labels", labels));
     }
 
+    /** Full hold request, including selections and replacement-hold semantics. */
+    public Map<String, Object> hold(String eventKey, Map<String, Object> request) {
+        return http.post(path(eventKey, "/hold"), request);
+    }
+
     public Map<String, Object> hold(String eventKey, List<String> labels, Long ttlMs, String idempotencyKey) {
         return http.post(path(eventKey, "/hold"), body("labels", labels, "ttlMs", ttlMs), idempotencyKey);
     }
@@ -158,6 +163,23 @@ public final class Inventory {
         return http.post(path(eventKey, "/extend"), body("holdId", holdId, "ttlMs", ttlMs));
     }
 
+    public Map<String, Object> extendHold(
+            String eventKey,
+            String holdId,
+            Long ttlMs,
+            List<String> channelIds,
+            Boolean ignoreChannelRestrictions,
+            String reason) {
+        return http.post(
+                path(eventKey, "/extend"),
+                body(
+                        "holdId", holdId,
+                        "ttlMs", ttlMs,
+                        "channelIds", channelIds,
+                        "ignoreChannelRestrictions", ignoreChannelRestrictions,
+                        "reason", reason));
+    }
+
     /** Authoritative items and prices. Charge from this, not the browser. */
     public Map<String, Object> retrieveHold(String eventKey, String holdId) {
         return http.get(path(eventKey, "/holds/" + encode(holdId)));
@@ -169,6 +191,13 @@ public final class Inventory {
 
     public Map<String, Object> book(String eventKey, String holdId, String bookingRef) {
         return http.post(path(eventKey, "/book"), body("holdId", holdId, "bookingRef", bookingRef(bookingRef)));
+    }
+
+    /** Full book request, including optional labels beside a hold id. */
+    public Map<String, Object> book(String eventKey, Map<String, Object> request) {
+        Map<String, Object> normalized = new java.util.LinkedHashMap<>(request);
+        normalized.put("bookingRef", bookingRef((String) request.get("bookingRef")));
+        return http.post(path(eventKey, "/book"), normalized);
     }
 
     public Map<String, Object> book(
@@ -229,6 +258,10 @@ public final class Inventory {
         return http.post(path(eventKey, "/block"), body("labels", labels));
     }
 
+    public Map<String, Object> block(String eventKey, List<String> labels, Long releaseAt) {
+        return http.post(path(eventKey, "/block"), body("labels", labels, "releaseAt", releaseAt));
+    }
+
     public Map<String, Object> unblock(String eventKey, List<String> labels) {
         return http.post(path(eventKey, "/unblock"), body("labels", labels));
     }
@@ -241,8 +274,8 @@ public final class Inventory {
         return http.get(path(eventKey, "/availability"));
     }
 
-    public Map<String, Object> updateAvailability(String eventKey, Map<String, Object> fields) {
-        return http.post(path(eventKey, "/availability"), fields);
+    public Map<String, Object> updateAvailability(String eventKey, Map<String, Object> rules) {
+        return http.post(path(eventKey, "/availability"), body("rules", rules));
     }
 
     /** One page of booking lifecycle records, newest first. */

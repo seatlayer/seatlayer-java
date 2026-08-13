@@ -228,11 +228,18 @@ support requests. All are unchecked, so they do not force `throws` clauses throu
 
 ## Reliability
 
-**Retries.** 429, 408 and 5xx are retried with exponential backoff and full jitter; `Retry-After`
-wins when the server sends it. 4xx is never retried — it will not start succeeding.
+**Retries and idempotency.** Reads (`GET`/`HEAD`) retry connection failures, 408, 429 and 5xx with
+exponential backoff and full jitter; `Retry-After` wins when the server sends it. Four create
+operations have the same retry behaviour with header replay: `charts().create`, `charts().copy`,
+`events().create`, and `workspaces().create`. They generate an `Idempotency-Key` when absent and
+reuse that key across every attempt. Overloads that accept a key let you provide a stable
+provisioning key instead.
 
-**Idempotency.** Every mutating request carries an `Idempotency-Key`, generated if you do not supply
-one, and **reused across retries** so a retried booking cannot become two bookings.
+All other mutations are single-attempt: holds, bookings, lifecycle changes, channel changes,
+show-once secret creation, and raw requests. The SDK does not generate a key for them. A supplied
+key on an existing typed-method overload is validated and forwarded once for compatibility, but it
+does not enable retries or promise replay. Reconcile bookings with their required `bookingRef`;
+never retry an unknown booking outcome as though the transport had made it safe.
 
 ```java
 SeatLayer.builder()
@@ -244,7 +251,8 @@ SeatLayer.builder()
 
 ## Escape hatch
 
-For surface this SDK does not wrap yet — same auth, retries, idempotency and error mapping:
+For surface this SDK does not wrap yet. Raw reads retain read retries; raw mutations use the same
+auth and error mapping but are sent once and never receive an automatically generated key:
 
 ```java
 seatlayer.request("POST", "/v1/events/ev_1/some-new-route", null, Map.of("qty", 2));

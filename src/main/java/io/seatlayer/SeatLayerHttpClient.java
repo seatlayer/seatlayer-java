@@ -39,6 +39,9 @@ final class SeatLayerHttpClient {
     record Response(int status, String body, Map<String, String> headers) {
     }
 
+    private record BinaryBody(byte[] bytes, String contentType) {
+    }
+
     private final String secretKey;
     private final String baseUrl;
     private final int maxRetries;
@@ -92,7 +95,16 @@ final class SeatLayerHttpClient {
             String method,
             String path,
             Map<String, Object> query,
-            Map<String, Object> body,
+            Map<String, Object> body) {
+        return performRequest(method, path, query, body, false, null);
+    }
+
+    private Map<String, Object> performRequest(
+            String method,
+            String path,
+            Map<String, Object> query,
+            Object body,
+            boolean headerReplay,
             String idempotencyKey) {
 
         StringBuilder url = new StringBuilder(baseUrl).append(path);
@@ -116,28 +128,30 @@ final class SeatLayerHttpClient {
         headers.put("User-Agent", "seatlayer-java");
 
         String payload = null;
-        if (body != null) {
+        if (body instanceof BinaryBody binary) {
+            payload = new String(binary.bytes(), StandardCharsets.ISO_8859_1);
+            headers.put("Content-Type", binary.contentType());
+        } else if (body != null) {
             payload = Json.write(body);
             headers.put("Content-Type", "application/json");
         }
 
-        // Every mutation carries one. A retried POST that creates a second hold is worse
-        // than a failed POST, and the caller cannot tell from outside — so the SDK,
-        // which knows it retried, is the right place to guarantee it.
-        if (!"GET".equals(method) && !"HEAD".equals(method)) {
+        boolean read = "GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method);
+        if (!read && (headerReplay || idempotencyKey != null)) {
             String key = idempotencyKey != null ? idempotencyKey : UUID.randomUUID().toString();
             assertValidIdempotencyKey(key);
             headers.put("Idempotency-Key", key);
         }
 
+        int attemptLimit = read || headerReplay ? maxRetries : 1;
         RuntimeException lastError = null;
-        for (int attempt = 0; attempt < maxRetries; attempt++) {
+        for (int attempt = 0; attempt < attemptLimit; attempt++) {
             Response response;
             try {
                 response = transport.send(method, url.toString(), headers, payload);
             } catch (SeatLayerConnectionException error) {
                 lastError = error;
-                if (attempt < maxRetries - 1) {
+                if (attempt < attemptLimit - 1) {
                     sleep(backoffSeconds(attempt, null));
                     continue;
                 }
@@ -161,7 +175,7 @@ final class SeatLayerHttpClient {
 
             double retryAfter = parseRetryAfter(response.headers(), errorBody);
 
-            if (isRetryableStatus(response.status()) && attempt < maxRetries - 1) {
+            if (isRetryableStatus(response.status()) && attempt < attemptLimit - 1) {
                 sleep(backoffSeconds(attempt, response.status() == 429 ? retryAfter : null));
                 continue;
             }
@@ -176,35 +190,60 @@ final class SeatLayerHttpClient {
     }
 
     Map<String, Object> get(String path) {
-        return request("GET", path, null, null, null);
+        return performRequest("GET", path, null, null, false, null);
     }
 
     Map<String, Object> get(String path, Map<String, Object> query) {
-        return request("GET", path, query, null, null);
+        return performRequest("GET", path, query, null, false, null);
     }
 
     Map<String, Object> post(String path) {
-        return request("POST", path, null, null, null);
+        return performRequest("POST", path, null, null, false, null);
     }
 
     Map<String, Object> post(String path, Map<String, Object> body) {
-        return request("POST", path, null, body, null);
+        return performRequest("POST", path, null, body, false, null);
     }
 
     Map<String, Object> post(String path, Map<String, Object> body, String idempotencyKey) {
-        return request("POST", path, null, body, idempotencyKey);
+        return performRequest("POST", path, null, body, false, idempotencyKey);
+    }
+
+    Map<String, Object> postWithHeaderReplay(String path) {
+        return performRequest("POST", path, null, null, true, null);
+    }
+
+    Map<String, Object> postWithHeaderReplay(String path, Map<String, Object> body) {
+        return performRequest("POST", path, null, body, true, null);
+    }
+
+    Map<String, Object> postWithHeaderReplay(
+            String path, Map<String, Object> body, String idempotencyKey) {
+        return performRequest("POST", path, null, body, true, idempotencyKey);
     }
 
     Map<String, Object> put(String path, Map<String, Object> body) {
-        return request("PUT", path, null, body, null);
+        return performRequest("PUT", path, null, body, false, null);
+    }
+
+    Map<String, Object> putBinary(String path, byte[] bytes, String contentType) {
+        if (!java.util.Set.of("image/png", "image/jpeg", "image/webp", "application/octet-stream")
+                .contains(contentType)) {
+            throw new IllegalArgumentException("Unsupported poster content type: " + contentType);
+        }
+        return performRequest("PUT", path, null, new BinaryBody(bytes.clone(), contentType), false, null);
     }
 
     Map<String, Object> patch(String path, Map<String, Object> body) {
-        return request("PATCH", path, null, body, null);
+        return performRequest("PATCH", path, null, body, false, null);
     }
 
     Map<String, Object> delete(String path) {
-        return request("DELETE", path, null, null, null);
+        return performRequest("DELETE", path, null, null, false, null);
+    }
+
+    Map<String, Object> delete(String path, Map<String, Object> query) {
+        return performRequest("DELETE", path, query, null, false, null);
     }
 
     /**
@@ -273,11 +312,15 @@ final class SeatLayerHttpClient {
         public Response send(String method, String url, Map<String, String> headers, String body) {
             HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url)).timeout(timeout);
             headers.forEach(builder::header);
-            builder.method(
-                    method,
-                    body == null
-                            ? HttpRequest.BodyPublishers.noBody()
-                            : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+            HttpRequest.BodyPublisher publisher;
+            if (body == null) {
+                publisher = HttpRequest.BodyPublishers.noBody();
+            } else if (headers.getOrDefault("Content-Type", "").equals("application/json")) {
+                publisher = HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8);
+            } else {
+                publisher = HttpRequest.BodyPublishers.ofByteArray(body.getBytes(StandardCharsets.ISO_8859_1));
+            }
+            builder.method(method, publisher);
 
             try {
                 HttpResponse<String> response =

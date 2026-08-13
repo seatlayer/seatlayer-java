@@ -52,15 +52,20 @@ public final class Events {
     }
 
     public Map<String, Object> create(String chartId) {
-        return http.post("/v1/events", body("chartId", chartId));
+        return http.postWithHeaderReplay("/v1/events", body("chartId", chartId));
     }
 
     public Map<String, Object> create(String chartId, String name) {
-        return http.post("/v1/events", body("chartId", chartId, "name", name));
+        return http.postWithHeaderReplay("/v1/events", body("chartId", chartId, "name", name));
+    }
+
+    /** Creates an event with the full public metadata request shape. */
+    public Map<String, Object> create(Map<String, Object> params) {
+        return http.postWithHeaderReplay("/v1/events", params);
     }
 
     public Map<String, Object> create(Map<String, Object> params, String idempotencyKey) {
-        return http.post("/v1/events", params, idempotencyKey);
+        return http.postWithHeaderReplay("/v1/events", params, idempotencyKey);
     }
 
     public Map<String, Object> retrieve(String eventKey) {
@@ -75,9 +80,27 @@ public final class Events {
         return http.delete("/v1/events/" + encode(eventKey));
     }
 
+    /** Upload raw PNG, JPEG, or WebP poster bytes (maximum 5 MiB). */
+    public Map<String, Object> updatePoster(String eventKey, byte[] bytes, String contentType) {
+        return http.putBinary("/v1/events/" + encode(eventKey) + "/poster", bytes, contentType);
+    }
+
+    public Map<String, Object> deletePoster(String eventKey) {
+        return http.delete("/v1/events/" + encode(eventKey) + "/poster");
+    }
+
     /** Move a live event onto the latest published version of its chart. */
     public Map<String, Object> updateChart(String eventKey) {
-        return http.post("/v1/events/" + encode(eventKey) + "/update-chart");
+        return updateChart(eventKey, null, null);
+    }
+
+    public Map<String, Object> updateChart(
+            String eventKey, Boolean acknowledgeDroppedAssignments, String reason) {
+        return http.post(
+                "/v1/events/" + encode(eventKey) + "/update-chart",
+                body(
+                        "acknowledgeDroppedAssignments", acknowledgeDroppedAssignments,
+                        "reason", reason));
     }
 
     /** Stop buyer sales. Existing holds keep their TTL. */
@@ -97,8 +120,10 @@ public final class Events {
         return http.get("/v1/events/" + encode(eventKey) + "/hold-ttl");
     }
 
-    public Map<String, Object> updateHoldTtl(String eventKey, long holdTtlMs) {
-        return http.post("/v1/events/" + encode(eventKey) + "/hold-ttl", body("holdTtlMs", holdTtlMs));
+    public Map<String, Object> updateHoldTtl(String eventKey, Long holdTtlMs) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("holdTtlMs", holdTtlMs);
+        return http.post("/v1/events/" + encode(eventKey) + "/hold-ttl", request);
     }
 
     public Map<String, Object> retrieveReport(String eventKey) {
@@ -107,5 +132,11 @@ public final class Events {
 
     public Map<String, Object> retrieveLog(String eventKey) {
         return http.get("/v1/events/" + encode(eventKey) + "/log");
+    }
+
+    public Map<String, Object> retrieveLog(String eventKey, Integer limit, Long before) {
+        return http.get(
+                "/v1/events/" + encode(eventKey) + "/log",
+                body("limit", limit, "before", before));
     }
 }

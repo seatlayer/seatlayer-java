@@ -111,14 +111,17 @@ class ClientTest {
         }
 
         @Test
-        @DisplayName("attaches an Idempotency-Key to mutations but not to reads")
-        void idempotencyKeyOnMutationsOnly() {
-            SeatLayer sdk = client(List.of(Stub.of(200, "{}"), Stub.of(201, "{}")));
+        @DisplayName("generates an Idempotency-Key only for header-replay mutations")
+        void idempotencyKeyOnlyOnHeaderReplayMutations() {
+            SeatLayer sdk = client(List.of(
+                    Stub.of(200, "{}"), Stub.of(201, "{}"), Stub.of(200, "{\"holdId\":\"h_1\"}")));
             sdk.events().list();
             sdk.events().create("c_1");
+            sdk.inventory().hold("ev_1", List.of("A-1"));
 
             assertNull(call(0).headers().get("Idempotency-Key"));
             assertTrue(call(1).headers().get("Idempotency-Key").matches("[A-Za-z0-9._:-]{1,128}"));
+            assertNull(call(2).headers().get("Idempotency-Key"));
         }
 
         @Test
@@ -188,6 +191,25 @@ class ClientTest {
         }
 
         @Test
+        @DisplayName("prefers body.code while preserving status, body, and request id")
+        void stableErrorContract() {
+            SeatLayer sdk = client(
+                    List.of(new Stub(
+                            422,
+                            "{\"error\":\"validation_failed\",\"code\":\"invalid_expiry\",\"field\":\"expiresAt\"}",
+                            Map.of("x-request-id", "req_contract"))),
+                    1);
+            var error = assertThrows(
+                    SeatLayerValidationException.class,
+                    () -> sdk.channels().createAccessLink(
+                            "ev_1", "ch_1", null, null, 1L, null, null, null, null));
+            assertEquals(422, error.status());
+            assertEquals("invalid_expiry", error.code());
+            assertEquals("expiresAt", error.body().get("field"));
+            assertEquals("req_contract", error.requestId());
+        }
+
+        @Test
         @DisplayName("survives an error body that is not JSON")
         void nonJsonErrorBody() {
             // A proxy or WAF can answer with HTML; that must not become a parse crash
@@ -214,6 +236,59 @@ class ClientTest {
             // Same key on the retry, or the server would create two events.
             assertEquals(
                     call(0).headers().get("Idempotency-Key"), call(1).headers().get("Idempotency-Key"));
+        }
+
+        @Test
+        @DisplayName("read retries remain enabled without an idempotency key")
+        void retriesReads() {
+            SeatLayer sdk = client(List.of(
+                    new Stub(429, "{\"error\":\"rate_limited\"}", Map.of("retry-after", "0")),
+                    Stub.of(200, "{\"meta\":{\"key\":\"ev_1\"}}")));
+            sdk.events().retrieve("ev_1");
+
+            assertEquals(2, calls.size());
+            assertNull(call(0).headers().get("Idempotency-Key"));
+            assertNull(call(1).headers().get("Idempotency-Key"));
+        }
+
+        @Test
+        @DisplayName("booking is single-attempt and does not generate an idempotency key")
+        void bookingIsSingleAttempt() {
+            SeatLayer sdk = client(List.of(
+                    new Stub(429, "{\"error\":\"rate_limited\"}", Map.of("retry-after", "0"))));
+
+            assertThrows(
+                    SeatLayerRateLimitException.class,
+                    () -> sdk.inventory().bookBestAvailable("ev_1", 2, "order-42"));
+            assertEquals(1, calls.size());
+            assertNull(call(0).headers().get("Idempotency-Key"));
+        }
+
+        @Test
+        @DisplayName("a supplied key on unsupported booking is forwarded without enabling retries")
+        void unsupportedExplicitKeyDoesNotEnableRetries() {
+            SeatLayer sdk = client(List.of(
+                    new Stub(429, "{\"error\":\"rate_limited\"}", Map.of("retry-after", "0"))));
+
+            assertThrows(
+                    SeatLayerRateLimitException.class,
+                    () -> sdk.inventory()
+                            .bookBestAvailable("ev_1", 2, "order-42", null, null, "retry-me"));
+            assertEquals(1, calls.size());
+            assertEquals("retry-me", call(0).headers().get("Idempotency-Key"));
+        }
+
+        @Test
+        @DisplayName("a raw mutation is single-attempt and has no generated idempotency key")
+        void rawMutationIsSingleAttempt() {
+            SeatLayer sdk = client(List.of(
+                    new Stub(429, "{\"error\":\"rate_limited\"}", Map.of("retry-after", "0"))));
+
+            assertThrows(
+                    SeatLayerRateLimitException.class,
+                    () -> sdk.request("POST", "/v1/future-mutation", null, Map.of("value", 1)));
+            assertEquals(1, calls.size());
+            assertNull(call(0).headers().get("Idempotency-Key"));
         }
 
         @Test
@@ -310,8 +385,8 @@ class ClientTest {
         @DisplayName("refuses to mint a manage session without explicit capabilities")
         void requiresCapabilities() {
             SeatLayer sdk = client(List.of());
-            // The API would default this to all four including event:cancel — the
-            // ability to reverse paid bookings should never arrive by omission.
+            // The API defaults omission to view-only, but the SDK requires an explicit
+            // grant so browser authority stays reviewable at the call site.
             var error = assertThrows(
                     IllegalArgumentException.class,
                     () -> sdk.sessions().createManageSession("ev_1", "https://box.example", List.of()));
@@ -367,6 +442,74 @@ class ClientTest {
             assertEquals(List.of("ch_partner"), body.get("channelIds"));
             assertEquals(false, body.get("ignoreChannelRestrictions"));
             assertEquals("partner checkout", body.get("reason"));
+        }
+
+        @Test
+        @DisplayName("extended inventory request shapes retain authority, release time, and nullable TTL")
+        void extendedInventoryContracts() {
+            SeatLayer sdk = client(List.of(
+                    Stub.of(200, "{\"ok\":true}"),
+                    Stub.of(200, "{\"ok\":true}"),
+                    Stub.of(200, "{\"ok\":true,\"holdTtlMs\":null}")));
+            sdk.inventory().extendHold(
+                    "ev_1", "h_1", null, List.of("ch_partner"), true, "staff override");
+            sdk.inventory().block("ev_1", List.of("A-1"), 1_800_000_000_000L);
+            sdk.events().updateHoldTtl("ev_1", null);
+
+            Map<String, Object> extend = Json.readObject(call(0).body());
+            assertEquals(List.of("ch_partner"), extend.get("channelIds"));
+            assertEquals(true, extend.get("ignoreChannelRestrictions"));
+            assertEquals("staff override", extend.get("reason"));
+            assertEquals(1_800_000_000_000L, Json.readObject(call(1).body()).get("releaseAt"));
+            assertTrue(Json.readObject(call(2).body()).containsKey("holdTtlMs"));
+        }
+
+        @Test
+        @DisplayName("event, poster, hosted link, designer, and webhook request shapes match the public contract")
+        void extendedPublicRequestContracts() {
+            SeatLayer sdk = client(List.of(
+                    Stub.of(201, "{\"meta\":{}}"),
+                    Stub.of(200, "{\"ok\":true,\"updated\":true,\"meta\":{}}"),
+                    Stub.of(200, "{\"meta\":{}}"),
+                    Stub.of(201, "{\"link\":{},\"capability\":\"x\"}"),
+                    Stub.of(201, "{\"session\":{\"id\":\"dse_1\"}}"),
+                    Stub.of(200, "{\"deliveries\":[]}"),
+                    Stub.of(200, "{\"sessions\":[]}"),
+                    Stub.of(200, "{\"ok\":true,\"channel\":{}}")));
+
+            sdk.events().create(Map.of(
+                    "chartId", "c_1",
+                    "description", "Gala",
+                    "endsAt", 1_800_000_000_000L,
+                    "timezone", "Europe/London",
+                    "locale", "en-GB",
+                    "mode", "test"));
+            sdk.events().updateChart("ev_1", true, "accept allocation drop");
+            sdk.events().updatePoster("ev_1", new byte[] {(byte) 0x89, 'P', 'N', 'G'}, "image/png");
+            Map<String, Object> linkResult = sdk.channels().createAccessLink(
+                    "ev/1", "ch/1", "Partner", false, null, 50, 4, 900, null);
+            Map<String, Object> designerResult = sdk.sessions().createDesignerSession(
+                    "ws_1", "c_1", "https://designer.example", "publish", "safe", null,
+                    true, Map.of("allowDeletingObjects", false), Map.of("tables", true));
+            sdk.webhooks().listDeliveries("wh_1", 25, "failed", 1_800_000_000_000L);
+            sdk.channels().listBuyerAccessSessions("ev_1", 20);
+            sdk.channels().archive("ev_1", "ch_1", null, "return to public");
+
+            assertEquals("test", Json.readObject(call(0).body()).get("mode"));
+            assertEquals(true, Json.readObject(call(1).body()).get("acknowledgeDroppedAssignments"));
+            assertEquals("image/png", call(2).headers().get("Content-Type"));
+            assertTrue(call(3).url().contains("/events/ev%2F1/channels/ch%2F1/access-links"));
+            assertEquals(true, Json.readObject(call(4).body()).get("canPublish"));
+            assertEquals("x", linkResult.get("capability"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> session = (Map<String, Object>) designerResult.get("session");
+            assertEquals("dse_1", session.get("id"));
+            assertTrue(call(5).url().contains("status=failed"));
+            assertEquals(
+                    "https://api.seatlayer.io/v1/events/ev_1/buyer-access-sessions?limit=20",
+                    call(6).url());
+            assertTrue(Json.readObject(call(7).body()).containsKey("destination"));
+            assertEquals(null, Json.readObject(call(7).body()).get("destination"));
         }
 
         @Test

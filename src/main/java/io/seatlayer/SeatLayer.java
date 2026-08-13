@@ -84,13 +84,18 @@ public final class SeatLayer {
         return http.get("/health/ready");
     }
 
+    /** Dependency-aware readiness probe with the Durable Object check enabled on demand. */
+    public Map<String, Object> ready(boolean deep) {
+        return http.get("/health/ready", deep ? Map.of("deep", "1") : Map.of());
+    }
+
     /**
-     * Escape hatch for surface this SDK does not wrap yet. Carries the same auth,
-     * retries, idempotency and error mapping.
+     * Escape hatch for surface this SDK does not wrap yet. Reads retain transport
+     * retries; raw mutations are sent once without an Idempotency-Key.
      */
     public Map<String, Object> request(
             String method, String path, Map<String, Object> query, Map<String, Object> body) {
-        return http.request(method, path, query, body, null);
+        return http.request(method, path, query, body);
     }
 
     /** Builder for base URL, retries, timeout, and a custom transport. */

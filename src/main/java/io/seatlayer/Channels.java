@@ -88,7 +88,7 @@ public final class Channels {
                 path(eventKey, "/preview"),
                 body(
                         "channelIds", channelIds == null ? null : String.join(",", channelIds),
-                        "includePublic", includePublic == null ? null : includePublic ? "1" : "0"));
+                        "includePublic", Boolean.TRUE.equals(includePublic) ? "1" : null));
     }
 
     public Map<String, Object> retrieveReport(String eventKey) {
@@ -105,9 +105,11 @@ public final class Channels {
 
     public Map<String, Object> archive(
             String eventKey, String channelId, String destination, String reason) {
+        Map<String, Object> request = new LinkedHashMap<>(body("reason", reason));
+        request.put("destination", destination);
         return http.post(
                 path(eventKey, "/" + encode(channelId) + "/archive"),
-                body("destination", destination, "reason", reason));
+                request);
     }
 
     /** Mints a short-lived, origin-bound buyer access token. */
@@ -136,15 +138,62 @@ public final class Channels {
                 idempotencyKey);
     }
 
-    public Map<String, Object> listBuyerAccessSessions(
-            String eventKey, String state, Integer limit, String cursor) {
+    public Map<String, Object> listBuyerAccessSessions(String eventKey, Integer limit) {
         return http.get(
                 "/v1/events/" + encode(eventKey) + "/buyer-access-sessions",
-                body("state", state, "limit", limit, "cursor", cursor));
+                body("limit", limit));
     }
 
     public Map<String, Object> revokeBuyerAccessSession(String eventKey, String sessionId) {
         return http.delete(
                 "/v1/events/" + encode(eventKey) + "/buyer-access-sessions/" + encode(sessionId));
+    }
+
+    public Map<String, Object> createAccessLink(
+            String eventKey,
+            String channelId,
+            String label,
+            Boolean includePublic,
+            Long expiresAt,
+            Integer maxRedemptions,
+            Integer maxQuantity,
+            Integer sessionTtlSeconds,
+            String reason) {
+        return http.post(
+                accessLinkPath(eventKey, channelId, ""),
+                body(
+                        "label", label,
+                        "includePublic", includePublic,
+                        "expiresAt", expiresAt,
+                        "maxRedemptions", maxRedemptions,
+                        "maxQuantity", maxQuantity,
+                        "sessionTtlSeconds", sessionTtlSeconds,
+                        "reason", reason));
+    }
+
+    public Map<String, Object> listAccessLinks(String eventKey, String channelId) {
+        return http.get(accessLinkPath(eventKey, channelId, ""));
+    }
+
+    public Map<String, Object> rotateAccessLink(
+            String eventKey, String channelId, String linkId, boolean endActiveSessions, String reason) {
+        return http.post(
+                accessLinkPath(eventKey, channelId, "/" + encode(linkId) + "/rotate"),
+                body("endActiveSessions", endActiveSessions, "reason", reason));
+    }
+
+    public Map<String, Object> revokeAccessLink(
+            String eventKey,
+            String channelId,
+            String linkId,
+            boolean endActiveSessions,
+            String reason) {
+        return http.delete(
+                accessLinkPath(eventKey, channelId, "/" + encode(linkId)),
+                body("endActiveSessions", endActiveSessions ? "1" : null, "reason", reason));
+    }
+
+    private String accessLinkPath(String eventKey, String channelId, String suffix) {
+        return path(eventKey, "/" + encode(channelId) + "/access-links" + suffix);
     }
 }

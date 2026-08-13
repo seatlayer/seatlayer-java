@@ -19,11 +19,12 @@ public final class Workspaces {
     }
 
     public Map<String, Object> create(String name) {
-        return http.post("/v1/workspaces", body("name", name));
+        return http.postWithHeaderReplay("/v1/workspaces", body("name", name));
     }
 
     public Map<String, Object> create(String name, String externalRef, String idempotencyKey) {
-        return http.post("/v1/workspaces", body("name", name, "externalRef", externalRef), idempotencyKey);
+        return http.postWithHeaderReplay(
+                "/v1/workspaces", body("name", name, "externalRef", externalRef), idempotencyKey);
     }
 
     public Map<String, Object> retrieve(String workspaceId) {
