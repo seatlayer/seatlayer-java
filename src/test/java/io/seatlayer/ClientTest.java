@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -125,6 +126,46 @@ class ClientTest {
         }
 
         @Test
+        @DisplayName("instantiates templates with an object body and escaped identifier")
+        void instantiateTemplateUsesObjectBodyAndEscapedPath() {
+            SeatLayer sdk = client(List.of(Stub.of(201, "{\"meta\":{}}")));
+
+            sdk.templates().instantiateTemplate("tpl / main");
+
+            assertEquals("POST", call(0).method());
+            assertEquals(
+                    "https://api.seatlayer.io/v1/templates/tpl%20%2F%20main/instantiate",
+                    call(0).url());
+            assertEquals("{}", call(0).body());
+            assertTrue(call(0).headers().get("Idempotency-Key").matches("[A-Za-z0-9._:-]{1,128}"));
+        }
+
+        @Test
+        @DisplayName("sends ticket-release routes and whole-list request body")
+        void ticketReleaseRoutesAndBody() {
+            SeatLayer sdk = client(List.of(
+                    Stub.of(200, "{\"releases\":[]}"),
+                    Stub.of(200, "{\"releases\":[]}"),
+                    Stub.of(200, "{\"releases\":[]}")));
+            Map<String, Object> release = new LinkedHashMap<>();
+            release.put("name", "Early bird");
+            release.put("price", 18);
+
+            sdk.events().listTicketReleases("ev / main");
+            sdk.events().updateTicketReleases("ev / main", List.of(release));
+            sdk.events().closeTicketRelease("ev / main", "rel / one");
+
+            assertEquals(
+                    "https://api.seatlayer.io/v1/events/ev%20%2F%20main/releases", call(0).url());
+            assertEquals("PUT", call(1).method());
+            assertEquals(
+                    "{\"releases\":[{\"name\":\"Early bird\",\"price\":18}]}", call(1).body());
+            assertEquals(
+                    "https://api.seatlayer.io/v1/events/ev%20%2F%20main/releases/rel%20%2F%20one/close",
+                    call(2).url());
+        }
+
+        @Test
         @DisplayName("rejects an idempotency key the API would reject")
         void rejectsBadIdempotencyKey() {
             assertThrows(
@@ -236,6 +277,43 @@ class ClientTest {
             // Same key on the retry, or the server would create two events.
             assertEquals(
                     call(0).headers().get("Idempotency-Key"), call(1).headers().get("Idempotency-Key"));
+        }
+
+        @Test
+        @DisplayName("template instantiation retries with one stable idempotency key")
+        void templateInstantiationRetriesAndReusesKey() {
+            SeatLayer sdk = client(List.of(
+                    new Stub(429, "{\"error\":\"rate_limited\"}", Map.of("retry-after", "0")),
+                    Stub.of(201, "{\"meta\":{}}")));
+
+            sdk.templates().instantiateTemplate("tpl_1");
+
+            assertEquals(2, calls.size());
+            assertEquals(
+                    call(0).headers().get("Idempotency-Key"), call(1).headers().get("Idempotency-Key"));
+        }
+
+        @Test
+        @DisplayName("ticket-release mutations are single-attempt")
+        void ticketReleaseMutationsAreSingleAttempt() {
+            SeatLayer updater = client(List.of(
+                    new Stub(429, "{\"error\":\"rate_limited\"}", Map.of("retry-after", "0"))));
+            Map<String, Object> release = new LinkedHashMap<>();
+            release.put("name", "Early bird");
+            release.put("price", 18);
+            assertThrows(
+                    SeatLayerRateLimitException.class,
+                    () -> updater.events().updateTicketReleases("ev_1", List.of(release)));
+            assertEquals(1, calls.size());
+            assertNull(call(0).headers().get("Idempotency-Key"));
+
+            SeatLayer closer = client(List.of(
+                    new Stub(429, "{\"error\":\"rate_limited\"}", Map.of("retry-after", "0"))));
+            assertThrows(
+                    SeatLayerRateLimitException.class,
+                    () -> closer.events().closeTicketRelease("ev_1", "rel_123456789abc"));
+            assertEquals(1, calls.size());
+            assertNull(call(0).headers().get("Idempotency-Key"));
         }
 
         @Test

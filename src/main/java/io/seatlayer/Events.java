@@ -4,6 +4,7 @@ import static io.seatlayer.SeatLayerHttpClient.body;
 import static io.seatlayer.SeatLayerHttpClient.encode;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /** Event lifecycle, metadata, reports. */
@@ -124,6 +125,31 @@ public final class Events {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("holdTtlMs", holdTtlMs);
         return http.post("/v1/events/" + encode(eventKey) + "/hold-ttl", request);
+    }
+
+    /** Lists the event's ticket releases, including current quota consumption. */
+    public Map<String, Object> listTicketReleases(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey) + "/releases");
+    }
+
+    /**
+     * Replaces the event's complete, ordered ticket-release list.
+     *
+     * <p>Each map is a release input. Do not send response-only fields such as
+     * {@code position}, {@code soldOutAt}, {@code consumed}, or {@code remaining}; the server
+     * derives those from the ordered replacement and live inventory.
+     */
+    public Map<String, Object> updateTicketReleases(
+            String eventKey, List<? extends Map<String, ?>> releases) {
+        return http.put(
+                "/v1/events/" + encode(eventKey) + "/releases",
+                body("releases", releases));
+    }
+
+    /** Ends one ticket release immediately. This mutation is intentionally single-attempt. */
+    public Map<String, Object> closeTicketRelease(String eventKey, String releaseId) {
+        return http.post(
+                "/v1/events/" + encode(eventKey) + "/releases/" + encode(releaseId) + "/close");
     }
 
     public Map<String, Object> retrieveReport(String eventKey) {

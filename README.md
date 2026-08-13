@@ -16,12 +16,12 @@ Official Java server SDK for the [SeatLayer](https://seatlayer.io) reserved-seat
 <dependency>
   <groupId>io.seatlayer</groupId>
   <artifactId>seatlayer-java</artifactId>
-  <version>0.2.0</version>
+  <version>0.4.0</version>
 </dependency>
 ```
 
 ```groovy
-implementation 'io.seatlayer:seatlayer-java:0.2.0'
+implementation 'io.seatlayer:seatlayer-java:0.4.0'
 ```
 
 Requires Java 17 or newer. **Zero runtime dependencies** — the SDK uses
@@ -36,8 +36,9 @@ import java.util.Map;
 
 SeatLayer seatlayer = new SeatLayer(System.getenv("SEATLAYER_SECRET_KEY"));
 
-// 1. Provision a venue for a new organiser from one of your templates.
-Map<String, Object> chart = (Map<String, Object>) seatlayer.charts().copy("c_template_arena").get("meta");
+// 1. Materialize a published catalog template as a draft for this organiser.
+Map<String, Object> chart = (Map<String, Object>) seatlayer.templates()
+    .instantiateTemplate("your-published-template").get("meta");
 seatlayer.charts().publish((String) chart.get("id"));
 
 // 2. Create an event on it.
@@ -229,11 +230,11 @@ support requests. All are unchecked, so they do not force `throws` clauses throu
 ## Reliability
 
 **Retries and idempotency.** Reads (`GET`/`HEAD`) retry connection failures, 408, 429 and 5xx with
-exponential backoff and full jitter; `Retry-After` wins when the server sends it. Four create
-operations have the same retry behaviour with header replay: `charts().create`, `charts().copy`,
-`events().create`, and `workspaces().create`. They generate an `Idempotency-Key` when absent and
-reuse that key across every attempt. Overloads that accept a key let you provide a stable
-provisioning key instead.
+exponential backoff and full jitter; `Retry-After` wins when the server sends it. Five
+provisioning operations have the same retry behaviour with header replay: `charts().create`,
+`charts().copy`, `templates().instantiateTemplate`, `events().create`, and
+`workspaces().create`. They generate an `Idempotency-Key` when absent and reuse that key across
+every attempt. Overloads that accept a key let you provide a stable provisioning key instead.
 
 All other mutations are single-attempt: holds, bookings, lifecycle changes, channel changes,
 show-once secret creation, and raw requests. The SDK does not generate a key for them. A supplied
@@ -263,7 +264,8 @@ seatlayer.request("POST", "/v1/events/ev_1/some-new-route", null, Map.of("qty", 
 | Resource | Methods |
 | --- | --- |
 | `charts()` | `list` `listAll` `create` `retrieve` `update` `delete` `copy` `archive` `unarchive` `publish` |
-| `events()` | `list` `listAll` `create` `retrieve` `update` `delete` `updateChart` `close` `reopen` `archive` `retrieveHoldTtl` `updateHoldTtl` `retrieveReport` `retrieveLog` |
+| `templates()` | `instantiateTemplate` |
+| `events()` | `list` `listAll` `create` `retrieve` `update` `delete` `updateChart` `close` `reopen` `archive` `retrieveHoldTtl` `updateHoldTtl` `listTicketReleases` `updateTicketReleases` `closeTicketRelease` `retrieveReport` `retrieveLog` |
 | `channels()` | `list` `create` `update` `updateAssignments` `listAllocation` `retrieveAccessPreview` `retrieveReport` `pause` `unpause` `archive` `createBuyerAccessSession` `listBuyerAccessSessions` `revokeBuyerAccessSession` |
 | `inventory()` | `hold` `holdBestAvailable` `bookBestAvailable` `extendHold` `retrieveHold` `release` `book` `bookLabels` `boxOfficeBook` `unbook` `block` `unblock` `unblockAll` `retrieveAvailability` `updateAvailability` `listBookings` `retrieveBooking` |
 | `sessions()` | `createManageSession` `revokeManageSession` `createDesignerSession` `revokeDesignerSession` |
