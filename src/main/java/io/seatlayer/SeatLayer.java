@@ -22,6 +22,7 @@ public final class SeatLayer {
     private final Events events;
     private final Inventory inventory;
     private final Sessions sessions;
+    private final Templates templates;
     private final Webhooks webhooks;
     private final Workspaces workspaces;
 
@@ -37,6 +38,7 @@ public final class SeatLayer {
         this.events = new Events(http);
         this.inventory = new Inventory(http);
         this.sessions = new Sessions(http);
+        this.templates = new Templates(http);
         this.webhooks = new Webhooks(http);
         this.workspaces = new Workspaces(http);
     }
@@ -64,6 +66,11 @@ public final class SeatLayer {
 
     public Sessions sessions() {
         return sessions;
+    }
+
+    /** Published catalog templates that can be materialized as chart drafts. */
+    public Templates templates() {
+        return templates;
     }
 
     public Webhooks webhooks() {
