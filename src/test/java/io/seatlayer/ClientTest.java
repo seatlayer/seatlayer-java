@@ -180,6 +180,57 @@ class ClientTest {
             sdk.charts().list(ChartListOptions.builder().workspaceId("ws_1").build());
             assertEquals("https://api.seatlayer.io/v1/charts?workspaceId=ws_1", call(0).url());
         }
+
+        @Test
+        @DisplayName("maps the full Performance Groups lifecycle")
+        void performanceGroupLifecycle() {
+            SeatLayer sdk = client(List.of(
+                    Stub.of(200, "{\"performanceGroups\":[]}"),
+                    Stub.of(201, "{\"performanceGroup\":{}}"),
+                    Stub.of(200, "{\"performanceGroup\":{}}"),
+                    Stub.of(204, ""),
+                    Stub.of(202, "{\"lifecycleOperation\":{\"terminal\":false}}"),
+                    Stub.of(200, "{\"lifecycleOperation\":{\"terminal\":true}}"),
+                    Stub.of(200, "{\"lifecycleOperation\":{}}"),
+                    Stub.of(201, "{\"token\":\"bsg_secret\"}"),
+                    Stub.of(200, "{\"sessions\":[]}"),
+                    Stub.of(200, "{\"ok\":true}"),
+                    Stub.of(200, "{\"hold\":{}}"),
+                    Stub.of(202, "{\"booking\":{\"state\":\"book_pending\"}}"),
+                    Stub.of(200, "{\"booking\":{\"state\":\"booked\"}}")));
+            String groupKey = "pg_a/b";
+
+            sdk.performanceGroups().list("ws_1", null, "draft", null, null);
+            sdk.performanceGroups().create("Weekend run", List.of("ev_1", "ev_2"), null, "weekend-run-1");
+            sdk.performanceGroups().retrieve(groupKey);
+            sdk.performanceGroups().delete(groupKey);
+            sdk.performanceGroups().activate(groupKey, 1);
+            sdk.performanceGroups().close(groupKey, 2);
+            sdk.performanceGroups().retrieveLifecycle(groupKey, "pga_1");
+            sdk.performanceGroups().createBuyerAccessSession(groupKey, "https://tickets.example.test", true);
+            sdk.performanceGroups().listBuyerAccessSessions(groupKey, 25);
+            sdk.performanceGroups().revokeBuyerAccessSession(groupKey, "pgbs_1");
+            sdk.performanceGroups().retrieveHold(groupKey, "pgh_1");
+            sdk.performanceGroups().bookHold(groupKey, "pgh_1", "book_1", "order_1");
+            sdk.performanceGroups().retrieveBooking(groupKey, "book_1");
+
+            String base = "https://api.seatlayer.io/v1/performance-groups/pg_a%2Fb";
+            assertEquals("https://api.seatlayer.io/v1/performance-groups?workspaceId=ws_1&state=draft", call(0).url());
+            assertEquals("weekend-run-1", call(1).headers().get("Idempotency-Key"));
+            assertEquals(base, call(2).url());
+            assertEquals("DELETE", call(3).method());
+            assertEquals(base + "/activate", call(4).url());
+            assertEquals(base + "/close", call(5).url());
+            assertEquals(base + "/lifecycle/pga_1", call(6).url());
+            assertEquals(base + "/buyer-access-sessions", call(7).url());
+            assertNull(call(7).headers().get("Idempotency-Key"));
+            assertEquals(base + "/buyer-access-sessions?limit=25", call(8).url());
+            assertEquals(base + "/buyer-access-sessions/pgbs_1", call(9).url());
+            assertEquals(base + "/holds/pgh_1", call(10).url());
+            assertEquals(base + "/holds/pgh_1/book", call(11).url());
+            assertNull(call(11).headers().get("Idempotency-Key"));
+            assertEquals(base + "/bookings/book_1", call(12).url());
+        }
     }
 
     @Nested

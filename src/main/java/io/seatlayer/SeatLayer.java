@@ -21,6 +21,7 @@ public final class SeatLayer {
     private final Channels channels;
     private final Events events;
     private final Inventory inventory;
+    private final PerformanceGroups performanceGroups;
     private final Sessions sessions;
     private final Templates templates;
     private final Webhooks webhooks;
@@ -37,6 +38,7 @@ public final class SeatLayer {
         this.channels = new Channels(http);
         this.events = new Events(http);
         this.inventory = new Inventory(http);
+        this.performanceGroups = new PerformanceGroups(http);
         this.sessions = new Sessions(http);
         this.templates = new Templates(http);
         this.webhooks = new Webhooks(http);
@@ -62,6 +64,11 @@ public final class SeatLayer {
 
     public Inventory inventory() {
         return inventory;
+    }
+
+    /** Fixed multi-performance lifecycle and host-side booking coordination. */
+    public PerformanceGroups performanceGroups() {
+        return performanceGroups;
     }
 
     public Sessions sessions() {
