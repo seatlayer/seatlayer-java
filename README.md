@@ -16,12 +16,12 @@ Official Java server SDK for the [SeatLayer](https://seatlayer.io) reserved-seat
 <dependency>
   <groupId>io.seatlayer</groupId>
   <artifactId>seatlayer-java</artifactId>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 
 ```groovy
-implementation 'io.seatlayer:seatlayer-java:0.4.0'
+implementation 'io.seatlayer:seatlayer-java:0.5.0'
 ```
 
 Requires Java 17 or newer. **Zero runtime dependencies** — the SDK uses
