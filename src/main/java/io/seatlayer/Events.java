@@ -73,6 +73,29 @@ public final class Events {
         return http.get("/v1/events/" + encode(eventKey));
     }
 
+    /** Reads the Event's exact immutable configuration binding and audit history. */
+    public Map<String, Object> retrieveConfigurationBinding(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey) + "/event-configuration");
+    }
+
+    /**
+     * Binds an exact published configuration version, or passes {@code null} to detach.
+     *
+     * <p>This compare-and-set mutation remains single-attempt because the public operation
+     * does not promise exact response replay.
+     */
+    public Map<String, Object> updateConfigurationBinding(
+            String eventKey, long expectedRevision, Map<String, ?> configuration) {
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("expectedRevision", expectedRevision);
+        // Null is meaningful here: it detaches the existing binding and must not
+        // be dropped by the optional-field body helper.
+        request.put("configuration", configuration);
+        return http.put(
+                "/v1/events/" + encode(eventKey) + "/event-configuration",
+                request);
+    }
+
     public Map<String, Object> update(String eventKey, Map<String, Object> fields) {
         return http.patch("/v1/events/" + encode(eventKey), fields);
     }

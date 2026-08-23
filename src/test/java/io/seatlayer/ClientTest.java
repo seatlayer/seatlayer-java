@@ -112,6 +112,38 @@ class ClientTest {
         }
 
         @Test
+        @DisplayName("reads, binds and explicitly detaches an Event configuration")
+        void eventConfigurationBindingContract() {
+            String binding = "{\"configuration\":{\"id\":\"ec_touring\",\"version\":3},"
+                    + "\"revision\":7,\"changedBy\":\"api-key:key_1\",\"changedAt\":123,"
+                    + "\"audit\":[]}";
+            SeatLayer sdk = client(List.of(
+                    Stub.of(200, binding), Stub.of(200, binding),
+                    Stub.of(200, "{\"configuration\":null,\"revision\":8,"
+                            + "\"changedBy\":\"api-key:key_1\",\"changedAt\":124,\"audit\":[]}")));
+
+            Map<String, Object> retrieved = sdk.events().retrieveConfigurationBinding("ev / main");
+            assertEquals(7L, retrieved.get("revision"));
+            Map<String, Object> configuration = new LinkedHashMap<>();
+            configuration.put("id", "ec_touring");
+            configuration.put("version", 3);
+            sdk.events().updateConfigurationBinding("ev / main", 6, configuration);
+            sdk.events().updateConfigurationBinding("ev / main", 7, null);
+
+            String expectedUrl = "https://api.seatlayer.io/v1/events/ev%20%2F%20main/event-configuration";
+            assertEquals(expectedUrl, call(0).url());
+            assertEquals(expectedUrl, call(1).url());
+            assertEquals(expectedUrl, call(2).url());
+            assertEquals("GET", call(0).method());
+            assertEquals(
+                    "{\"expectedRevision\":6,\"configuration\":{\"id\":\"ec_touring\",\"version\":3}}",
+                    call(1).body());
+            assertEquals("{\"expectedRevision\":7,\"configuration\":null}", call(2).body());
+            assertNull(call(1).headers().get("Idempotency-Key"));
+            assertNull(call(2).headers().get("Idempotency-Key"));
+        }
+
+        @Test
         @DisplayName("generates an Idempotency-Key only for header-replay mutations")
         void idempotencyKeyOnlyOnHeaderReplayMutations() {
             SeatLayer sdk = client(List.of(

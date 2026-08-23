@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added exact immutable Event configuration binding reads and compare-and-set
+  attach/detach through `Events.retrieveConfigurationBinding` and
+  `Events.updateConfigurationBinding`. Updates remain deliberately
+  single-attempt.
+
 - **Security/reliability:** Mutations now default to a single attempt. Automatic header-replay
   retries are limited to chart create/copy, template instantiation, event create, and workspace
   create, preventing transient failures from duplicating holds or best-available results and from
