@@ -10,7 +10,7 @@
   <packaging>jar</packaging>
 
   <name>SeatLayer Java SDK</name>
-  <description>Official Java server SDK for the SeatLayer reserved-seating API.</description>
+  <description>Official Java server SDK for the SeatLayer reserved-seating ticketing API. Server-side only: inspect seat holds, price from server data, book seats with a stable booking reference, and manage seating charts, seat maps, events, sales channels, and live seat inventory from Java or Kotlin.</description>
   <url>https://seatlayer.io/</url>
 
   <licenses>
