@@ -11,7 +11,7 @@ and live seat inventory through one typed ticketing API client.
 
 [SeatLayer artifact on Maven Central](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java) ·
 [SeatLayer server SDK documentation](https://docs.seatlayer.io/server-sdk/install/) ·
-[SeatLayer reserved-seating platform](https://seatlayer.io/) ·
+[SeatLayer developer platform](https://seatlayer.io/developers/) ·
 [SeatLayer JavaScript seat map SDK](https://www.npmjs.com/package/@seatlayer/js) ·
 [SeatLayer AI Toolkit](https://github.com/seatlayer/seatlayer-ai-toolkit)
 
@@ -62,6 +62,33 @@ seatlayer.inventory().book((String) event.get("key"), (String) held.get("holdId"
 ```
 
 ## Test vs live
+
+## Fixed Renewable Seasons (unpublished candidate)
+
+The source candidate exposes all 48 trusted organizer operations through
+`seatlayer.seasons()`. It is not part of the currently published Maven Central
+artifact and does not make a production-support claim.
+
+After the test hold/book/cancel journey and matching webhook deliveries,
+`validateSeasonBuyerRehearsal(seasonKey)` sends no evidence body; SeatLayer
+discovers the retained chain automatically. Retrieved Season holds contain
+inventory identity, not an authoritative amount—your platform owns package
+price, payment, order, tax, refunds, benefits, and ticket or pass delivery.
+
+```java
+Map<String, Object> checked = seatlayer.seasons().validateSeason(Map.of(
+    "sourcePerformanceGroupKeys", List.of("pg_subscription_run")));
+Map<String, Object> created = seatlayer.seasons().createSeason(Map.of(
+    "name", "2027 subscription",
+    "sourcePerformanceGroupKeys", List.of("pg_subscription_run")),
+    "season-create-2027");
+```
+
+Treat `202` as accepted work and poll `retrieveSeasonLifecycle()` with the
+returned operation identity. Buyer-session minting and domain-exact booking,
+cancellation, and renewal actions remain single-attempt; only declared
+header-replay catalogue mutations retry automatically.
+
 
 Keys carry their own mode. `sk_test_…` keys can only touch test-mode events and `sk_live_…` only
 live ones; crossing them returns `403 mode_mismatch`, surfaced as `SeatLayerAuthException` with

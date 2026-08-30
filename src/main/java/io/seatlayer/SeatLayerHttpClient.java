@@ -222,6 +222,11 @@ final class SeatLayerHttpClient {
         return performRequest("POST", path, null, body, true, idempotencyKey);
     }
 
+    Map<String, Object> mutationWithHeaderReplay(
+            String method, String path, Map<String, Object> body, String idempotencyKey) {
+        return performRequest(method, path, null, body, true, idempotencyKey);
+    }
+
     Map<String, Object> put(String path, Map<String, Object> body) {
         return performRequest("PUT", path, null, body, false, null);
     }
