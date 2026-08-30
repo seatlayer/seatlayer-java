@@ -22,6 +22,7 @@ public final class SeatLayer {
     private final Events events;
     private final Inventory inventory;
     private final PerformanceGroups performanceGroups;
+    private final Seasons seasons;
     private final Sessions sessions;
     private final Templates templates;
     private final Webhooks webhooks;
@@ -39,6 +40,7 @@ public final class SeatLayer {
         this.events = new Events(http);
         this.inventory = new Inventory(http);
         this.performanceGroups = new PerformanceGroups(http);
+        this.seasons = new Seasons(http);
         this.sessions = new Sessions(http);
         this.templates = new Templates(http);
         this.webhooks = new Webhooks(http);
@@ -69,6 +71,11 @@ public final class SeatLayer {
     /** Fixed multi-performance lifecycle and host-side booking coordination. */
     public PerformanceGroups performanceGroups() {
         return performanceGroups;
+    }
+
+    /** Fixed Renewable Season catalogue, lifecycle, renewal, and support operations. */
+    public Seasons seasons() {
+        return seasons;
     }
 
     public Sessions sessions() {
