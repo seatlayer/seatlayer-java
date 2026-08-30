@@ -6,7 +6,7 @@
 
   <groupId>io.seatlayer</groupId>
   <artifactId>seatlayer-java</artifactId>
-  <version>0.6.1</version>
+  <version>0.7.0</version>
   <packaging>jar</packaging>
 
   <name>SeatLayer Java SDK</name>
