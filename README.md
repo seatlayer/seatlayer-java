@@ -4,36 +4,36 @@
 [![Maven Central](https://img.shields.io/maven-central/v/io.seatlayer/seatlayer-java.svg)](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java)
 [![License: MIT](https://img.shields.io/badge/license-MIT-111827.svg)](LICENSE)
 
-The official SeatLayer Java server SDK is the **trusted side** of a reserved-seating
-integration: inspect the holds a buyer created, price from server data, and book with a
-stable `bookingRef`. From Java or Kotlin you manage seating charts, events, sales channels,
-and live seat inventory through one typed ticketing API client.
+SeatLayer's official Java server SDK is the **trusted side** of its reserved seating and seat
+booking API: inspect the holds a buyer created, price from server data, and book with a stable
+`bookingRef`. From Java or Kotlin you manage seating charts, events, sales channels, and live
+seat inventory through one typed ticketing API client.
 
 [SeatLayer artifact on Maven Central](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java) ·
-[SeatLayer server SDK documentation](https://docs.seatlayer.io/server-sdk/install/) ·
+[Java server SDK guide](https://docs.seatlayer.io/server-sdk/java/) ·
 [SeatLayer developer platform](https://seatlayer.io/developers/) ·
 [SeatLayer JavaScript seat map SDK](https://www.npmjs.com/package/@seatlayer/js) ·
-[SeatLayer AI Toolkit](https://github.com/seatlayer/seatlayer-ai-toolkit)
+[Server API reference](https://docs.seatlayer.io/server-api/events/)
 
 > **Server-side only.** This library authenticates with your secret key. Never ship it in an
 > Android app or anything a ticket buyer can reach — browser and mobile surfaces get short-lived,
 > origin-bound tokens that you mint here.
 
-## Install
+## Install the Java and Kotlin seat booking SDK
 
 ```xml
 <dependency>
   <groupId>io.seatlayer</groupId>
   <artifactId>seatlayer-java</artifactId>
-  <version>0.6.0</version>
+  <version>0.7.0</version>
 </dependency>
 ```
 
 ```groovy
-implementation 'io.seatlayer:seatlayer-java:0.6.0'
+implementation 'io.seatlayer:seatlayer-java:0.7.0'
 ```
 
-Published on Maven Central as `io.seatlayer:seatlayer-java`; `0.6.0` is the current release, so no
+Published on Maven Central as `io.seatlayer:seatlayer-java`; `0.7.0` is the current release, so no
 extra repository declaration is needed. Requires Java 17 or newer. **Zero runtime dependencies** — the SDK uses
 `java.net.http.HttpClient` and `javax.crypto.Mac` from the JDK plus a small hand-written JSON
 codec, so it never forces a Jackson or OkHttp version on an application that already has one.
@@ -47,6 +47,7 @@ import java.util.Map;
 SeatLayer seatlayer = new SeatLayer(System.getenv("SEATLAYER_SECRET_KEY"));
 
 // 1. Materialize a published catalog template as a draft for this organiser.
+// Replace this placeholder with a template id from your catalog.
 Map<String, Object> chart = (Map<String, Object>) seatlayer.templates()
     .instantiateTemplate("your-published-template").get("meta");
 seatlayer.charts().publish((String) chart.get("id"));
@@ -60,8 +61,6 @@ Map<String, Object> held = seatlayer.inventory().holdBestAvailable((String) even
 // … take payment against held.get("items"), which carry authoritative prices …
 seatlayer.inventory().book((String) event.get("key"), (String) held.get("holdId"), "order-8842");
 ```
-
-## Test vs live
 
 ## Fixed Renewable Seasons
 
@@ -88,6 +87,7 @@ returned operation identity. Buyer-session minting and domain-exact booking,
 cancellation, and renewal actions remain single-attempt; only declared
 header-replay catalogue mutations retry automatically.
 
+## Test vs live
 
 Keys carry their own mode. `sk_test_…` keys can only touch test-mode events and `sk_live_…` only
 live ones; crossing them returns `403 mode_mismatch`, surfaced as `SeatLayerAuthException` with
@@ -100,14 +100,32 @@ if ("production".equals(System.getenv("ENV")) && !"live".equals(seatlayer.mode()
 }
 ```
 
-## The two selling flows
+## Book reserved seats from Java
 
 **Buyer picks seats in the browser.** Your frontend holds them; your backend confirms the price and
 books. Never price from what the browser sent you — `retrieveHold` is authoritative.
 
 ```java
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 Map<String, Object> hold = seatlayer.inventory().retrieveHold(eventKey, holdId);
-// … charge the total of hold.get("items") in hold.get("currency") …
+List<Map<String, Object>> items = (List<Map<String, Object>>) hold.get("items");
+Set<String> currencies = items.stream()
+    .map(item -> (String) item.get("currency"))
+    .collect(Collectors.toSet());
+if (currencies.size() != 1) {
+    throw new IllegalStateException("A hold must use one currency");
+}
+String currency = currencies.iterator().next();
+BigDecimal total = items.stream()
+    .map(item -> new BigDecimal(item.get("unitPrice").toString())
+        .multiply(new BigDecimal(item.getOrDefault("quantity", 1).toString())))
+    .reduce(BigDecimal.ZERO, BigDecimal::add);
+// … charge `total` in `currency` …
 seatlayer.inventory().book(eventKey, holdId, charge.id());
 ```
 
@@ -202,9 +220,11 @@ Map<String, Object> session = seatlayer.sessions().createManageSession(
     3600);
 ```
 
-`capabilities` is **required** by this SDK even though the API defaults it. That default grants all
-four including `event:cancel`, which reverses paid bookings — not something that should arrive by
-forgetting an argument. Grant the smallest set the page needs.
+`capabilities` is **required** by this SDK even though the raw API safely defaults an omitted list
+to view-only (`event:view`). Keeping the argument required makes browser authority visible at every
+call site. Grant the smallest set the page needs. For Platform/SDK events, `event:cancel` returns a
+booking's inventory to sale but does not move gateway money; eligible Managed Ticketing refunds use
+the separate `event:refund` capability.
 
 ## Webhooks
 
@@ -266,17 +286,19 @@ support requests. All are unchecked, so they do not force `throws` clauses throu
 ## Reliability
 
 **Retries and idempotency.** Reads (`GET`/`HEAD`) retry connection failures, 408, 429 and 5xx with
-exponential backoff and full jitter; `Retry-After` wins when the server sends it. Five
-provisioning operations have the same retry behaviour with header replay: `charts().create`,
-`charts().copy`, `templates().instantiateTemplate`, `events().create`, and
-`workspaces().create`. They generate an `Idempotency-Key` when absent and reuse that key across
-every attempt. Overloads that accept a key let you provide a stable provisioning key instead.
+exponential backoff and full jitter; `Retry-After` wins when the server sends it. Fourteen mutations
+use exact header replay: `charts().create`, `charts().copy`,
+`templates().instantiateTemplate`, `events().create`, `workspaces().create`,
+`performanceGroups().create`, `seasons().createSeason`, `seasons().updateSeason`,
+`seasons().deleteSeason`, `seasons().createSeasonPlan`, `seasons().duplicateSeasonToLive`,
+`seasons().createSeasonHolderImport`, `seasons().createSeasonRenewalOffers`, and
+`seasons().createSeasonAmendment`. They generate an `Idempotency-Key` when absent and reuse that key
+across every attempt. Overloads that accept a key let you provide a stable provisioning key instead.
 
-All other mutations are single-attempt: holds, bookings, lifecycle changes, channel changes,
-show-once secret creation, and raw requests. The SDK does not generate a key for them. A supplied
-key on an existing typed-method overload is validated and forwarded once for compatibility, but it
-does not enable retries or promise replay. Reconcile bookings with their required `bookingRef`;
-never retry an unknown booking outcome as though the transport had made it safe.
+All remaining SDK mutations are single-attempt: holds, bookings, lifecycle changes, channel
+changes, show-once secret creation, and raw requests. Some have a server-side domain idempotency
+contract, but the SDK does not retry them automatically. Reconcile bookings with their required
+`bookingRef`; never retry an unknown booking outcome as though the transport had made it safe.
 
 ```java
 SeatLayer.builder()
@@ -297,6 +319,10 @@ seatlayer.request("POST", "/v1/events/ev_1/some-new-route", null, Map.of("qty", 
 
 ## API surface
 
+The client exposes these resources. Performance Groups cover runs, sessions, holds, and bookings;
+Seasons cover catalogue, plan, sales, buyer-session, booking, renewal, occurrence, reporting,
+outbox, and support operations.
+
 | Resource | Methods |
 | --- | --- |
 | `charts()` | `list` `listAll` `create` `retrieve` `update` `delete` `copy` `archive` `unarchive` `publish` |
@@ -307,8 +333,10 @@ seatlayer.request("POST", "/v1/events/ev_1/some-new-route", null, Map.of("qty", 
 | `sessions()` | `createManageSession` `revokeManageSession` `createDesignerSession` `revokeDesignerSession` |
 | `webhooks()` | `list` `create` `update` `delete` `listDeliveries` |
 | `workspaces()` | `list` `create` `retrieve` `update` |
+| `performanceGroups()` | `list` `create` `retrieve` `delete` `activate` `close` `retrieveLifecycle` `createBuyerAccessSession` `listBuyerAccessSessions` `revokeBuyerAccessSession` `retrieveHold` `bookHold` `retrieveBooking` |
+| `seasons()` | 48 operations for catalogue and Plan lifecycle, sales windows, buyer access and booking, holder imports, renewals, occurrence amendments, reports, audit, outbox, and support export |
 
-Full reference: [docs.seatlayer.io/server-sdk](https://docs.seatlayer.io/server-sdk/install/)
+Full reference: [SeatLayer Java server SDK guide](https://docs.seatlayer.io/server-sdk/java/)
 
 ## Frequently asked questions
 
@@ -332,24 +360,25 @@ sale from `inventory().retrieveHold(...)`, never from values the client sent you
 ### How do temporary seat holds work server-side?
 
 A hold reserves seats against concurrent buyers for a limited checkout window. From Java you
-retrieve it with `inventory().retrieveHold(...)`, whose items and currency are authoritative for
-pricing, and confirm it with `inventory().book(...)`. Use `inventory().extendHold(...)` for a long
-checkout instead of releasing and re-holding, which would hand the seats to whoever is racing for
-them. Booking is a single automatic attempt: after an unknown network outcome you may reconcile and
-repeat the exact same event, hold, and `bookingRef` — seats already booked under that reference are
-not sold again.
+retrieve it with `inventory().retrieveHold(...)`, whose item-level price, quantity, and currency
+are authoritative, and confirm it with `inventory().book(...)`. Use
+`inventory().extendHold(...)` for a long checkout instead of releasing and re-holding, which would
+hand the seats to whoever is racing for them. Booking is a single automatic attempt: after an
+unknown network outcome you may reconcile and repeat the exact same event, hold, and `bookingRef` —
+seats already booked under that reference are not sold again.
 
 ### Can I use my own payment provider?
 
-Yes. SeatLayer never processes payment. Charge through Stripe, Adyen, Braintree, or any provider
-you already use, calculating the total from the server-inspected hold items rather than from client
-input, then call `inventory().book(...)` with your charge or order id as the `bookingRef`. The
-[holds and checkout guide](https://docs.seatlayer.io/buyer-sdk/holds-and-checkout/) walks through
-the full handoff.
+Yes. This server SDK does not process payment in a Platform/SDK integration. Charge through the
+provider you already use, calculating the total from each server-inspected hold item's
+`unitPrice`, `quantity`, and `currency`, then call `inventory().book(...)` with your charge or order
+id as the `bookingRef`. Managed Ticketing is a separate product path with organizer-connected
+payments. The [holds and checkout guide](https://docs.seatlayer.io/buyer-sdk/holds-and-checkout/)
+walks through the full handoff.
 
 ## Continue your Java integration
 
-- [Follow the SeatLayer server SDK guide](https://docs.seatlayer.io/server-sdk/install/)
+- [Follow the Java server SDK guide](https://docs.seatlayer.io/server-sdk/java/)
   for installation, authentication, and the full hold-to-booking flow.
 - [Handle errors, retries, and safe booking repeats](https://docs.seatlayer.io/server-sdk/reliability/)
   before connecting a production order flow.
