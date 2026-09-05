@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.1 — 2026-09-05
+
+- Clarifies the Maven Central package name and description around Java and
+  Kotlin seat booking, inventory and webhook workflows, with a direct link to
+  the Java integration guide.
+- Refreshes README checkout examples, retry guidance and API coverage. Public
+  APIs and runtime behavior are unchanged from 0.7.0.
+
 ## 0.7.0 — 2026-08-30
 
 - Added coverage for all 48 Fixed Renewable Season server
