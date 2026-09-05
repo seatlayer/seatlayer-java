@@ -25,15 +25,15 @@ seat inventory through one typed ticketing API client.
 <dependency>
   <groupId>io.seatlayer</groupId>
   <artifactId>seatlayer-java</artifactId>
-  <version>0.7.0</version>
+  <version>0.7.1</version>
 </dependency>
 ```
 
 ```groovy
-implementation 'io.seatlayer:seatlayer-java:0.7.0'
+implementation 'io.seatlayer:seatlayer-java:0.7.1'
 ```
 
-Published on Maven Central as `io.seatlayer:seatlayer-java`; `0.7.0` is the current release, so no
+Published on Maven Central as `io.seatlayer:seatlayer-java`; `0.7.1` is the current release, so no
 extra repository declaration is needed. Requires Java 17 or newer. **Zero runtime dependencies** — the SDK uses
 `java.net.http.HttpClient` and `javax.crypto.Mac` from the JDK plus a small hand-written JSON
 codec, so it never forces a Jackson or OkHttp version on an application that already has one.
