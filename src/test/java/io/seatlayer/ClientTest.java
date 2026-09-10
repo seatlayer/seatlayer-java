@@ -644,6 +644,7 @@ class ClientTest {
                     "endsAt", 1_800_000_000_000L,
                     "timezone", "Europe/London",
                     "locale", "en-GB",
+                    "region", EventHostingRegion.WESTERN_EUROPE.value(),
                     "mode", "test"));
             sdk.events().updateChart("ev_1", true, "accept allocation drop");
             sdk.events().updatePoster("ev_1", new byte[] {(byte) 0x89, 'P', 'N', 'G'}, "image/png");
@@ -657,6 +658,7 @@ class ClientTest {
             sdk.channels().archive("ev_1", "ch_1", null, "return to public");
 
             assertEquals("test", Json.readObject(call(0).body()).get("mode"));
+            assertEquals("western-europe", Json.readObject(call(0).body()).get("region"));
             assertEquals(true, Json.readObject(call(1).body()).get("acknowledgeDroppedAssignments"));
             assertEquals("image/png", call(2).headers().get("Content-Type"));
             assertTrue(call(3).url().contains("/events/ev%2F1/channels/ch%2F1/access-links"));

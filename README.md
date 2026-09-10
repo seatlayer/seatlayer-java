@@ -54,13 +54,32 @@ seatlayer.charts().publish((String) chart.get("id"));
 
 // 2. Create an event on it.
 Map<String, Object> event =
-    (Map<String, Object>) seatlayer.events().create((String) chart.get("id"), "Spring Gala").get("meta");
+    (Map<String, Object>) seatlayer.events().create(Map.of(
+        "chartId", chart.get("id"),
+        "name", "Spring Gala",
+        "currency", "EUR", // omit to inherit the workspace currency
+        "region", EventHostingRegion.WESTERN_EUROPE.value() // India: ASIA_PACIFIC
+    )).get("meta");
 
 // 3. Sell four seats over the phone.
 Map<String, Object> held = seatlayer.inventory().holdBestAvailable((String) event.get("key"), 4);
 // … take payment against held.get("items"), which carry authoritative prices …
 seatlayer.inventory().book((String) event.get("key"), (String) held.get("holdId"), "order-8842");
 ```
+
+## Event hosting region
+
+Put `region` in the map passed to `events().create()` based on the **event venue**, not your API
+server or office. It controls the initial placement of the Event's live inventory;
+an existing Event cannot be moved later. Omit it to inherit the workspace default (`western-europe` for new accounts).
+Use the typed `workspaces().create(name, region)` and
+`workspaces().updateDefaultRegion(workspaceId, region)` overloads; updates affect only future Events.
+
+- `western-europe`, `eastern-europe`, `north-america-east`, `north-america-west`, `south-america`
+- `asia-pacific`, `northeast-asia`, `southeast-asia`, `oceania`, `africa`, `middle-east`
+
+The hint is best effort, not a data-residency guarantee. See the
+[full Event region guide](https://docs.seatlayer.io/server-api/event-regions/).
 
 ## Fixed Renewable Seasons
 

@@ -60,6 +60,11 @@ public final class Events {
         return http.postWithHeaderReplay("/v1/events", body("chartId", chartId, "name", name));
     }
 
+    public Map<String, Object> create(String chartId, String name, EventHostingRegion region) {
+        return http.postWithHeaderReplay(
+                "/v1/events", body("chartId", chartId, "name", name, "region", region.value()));
+    }
+
     /** Creates an event with the full public metadata request shape. */
     public Map<String, Object> create(Map<String, Object> params) {
         return http.postWithHeaderReplay("/v1/events", params);
