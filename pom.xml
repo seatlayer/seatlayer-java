@@ -6,7 +6,7 @@
 
   <groupId>io.seatlayer</groupId>
   <artifactId>seatlayer-java</artifactId>
-  <version>0.7.1</version>
+  <version>0.8.0</version>
   <packaging>jar</packaging>
 
   <name>SeatLayer Java Seat Booking and Reserved Seating SDK</name>
