@@ -22,6 +22,11 @@ public final class Workspaces {
         return http.postWithHeaderReplay("/v1/workspaces", body("name", name));
     }
 
+    public Map<String, Object> create(String name, EventHostingRegion defaultRegion) {
+        return http.postWithHeaderReplay(
+                "/v1/workspaces", body("name", name, "defaultRegion", defaultRegion.value()));
+    }
+
     public Map<String, Object> create(String name, String externalRef, String idempotencyKey) {
         return http.postWithHeaderReplay(
                 "/v1/workspaces", body("name", name, "externalRef", externalRef), idempotencyKey);
@@ -39,5 +44,11 @@ public final class Workspaces {
      */
     public Map<String, Object> update(String workspaceId, Map<String, Object> fields) {
         return http.patch("/v1/workspaces/" + encode(workspaceId), fields);
+    }
+
+    /** Changes the default used only by Events created after this update. */
+    public Map<String, Object> updateDefaultRegion(
+            String workspaceId, EventHostingRegion defaultRegion) {
+        return update(workspaceId, body("defaultRegion", defaultRegion.value()));
     }
 }
