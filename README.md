@@ -4,7 +4,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/io.seatlayer/seatlayer-java.svg)](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java)
 [![License: MIT](https://img.shields.io/badge/license-MIT-111827.svg)](LICENSE)
 
-SeatLayer is interactive seating chart software built for stadium scale. Platforms embed the white-label seat picker with their own checkout; organizers sell seated events on their own website with their own payment gateway.
+The official Java client for the SeatLayer API. `io.seatlayer:seatlayer-java` lets a Java or Kotlin backend inspect seat holds, price orders from server data, book reserved seats and verify webhooks, with zero runtime dependencies. SeatLayer is seating chart and reserved-seat ticketing software built for venues up to stadium scale.
 
 SeatLayer's official Java server SDK is the **trusted side** of its reserved seating and seat
 booking API: inspect the holds a buyer created, price from server data, and book with a stable
@@ -44,7 +44,7 @@ implementation 'io.seatlayer:seatlayer-java:0.8.0'
 ```
 
 Published on Maven Central as `io.seatlayer:seatlayer-java`; `0.8.0` is the current release, so no
-extra repository declaration is needed. Requires Java 17 or newer. **Zero runtime dependencies** — the SDK uses
+extra repository declaration is needed. Requires Java 17 or newer. **Zero runtime dependencies**: the SDK uses
 `java.net.http.HttpClient` and `javax.crypto.Mac` from the JDK plus a small hand-written JSON
 codec, so it never forces a Jackson or OkHttp version on an application that already has one.
 
@@ -99,7 +99,7 @@ Version `0.7.0` exposes all 48 trusted organizer operations through
 After the test hold/book/cancel journey and matching webhook deliveries,
 `validateSeasonBuyerRehearsal(seasonKey)` sends no evidence body; SeatLayer
 discovers the retained chain automatically. Retrieved Season holds contain
-inventory identity, not an authoritative amount—your platform owns package
+inventory identity, not an authoritative amount. Your platform owns package
 price, payment, order, tax, refunds, benefits, and ticket or pass delivery.
 
 ```java
@@ -132,7 +132,7 @@ if ("production".equals(System.getenv("ENV")) && !"live".equals(seatlayer.mode()
 ## Book reserved seats from Java
 
 **Buyer picks seats in the browser.** Your frontend holds them; your backend confirms the price and
-books. Never price from what the browser sent you — `retrieveHold` is authoritative.
+books. Never price from what the browser sent you: `retrieveHold` is authoritative.
 
 ```java
 import java.math.BigDecimal;
@@ -161,7 +161,7 @@ seatlayer.inventory().book(eventKey, holdId, charge.id());
 **Your backend picks the seats.** Phone orders, box office, comps.
 
 ```java
-// Payment already taken — book outright, so nothing is stranded if a second call fails.
+// Payment already taken: book outright, so nothing is stranded if a second call fails.
 seatlayer.inventory().bookBestAvailable(eventKey, 2, "phone-1183");
 
 // Or name the seats yourself.
@@ -200,7 +200,7 @@ explicit privileged `ignoreChannelRestrictions` flag, and an audit `reason`.
 ## Listing and pagination
 
 `list()` returns one `Page` plus a cursor. When you want everything, `listAll()` pages for you and
-yields as you consume it — a lazy `Iterable` rather than a `List`, because the point of paginating
+yields as you consume it. It is a lazy `Iterable` rather than a `List`, because the point of paginating
 is to *not* hold an unbounded result set in memory.
 
 ```java
@@ -217,8 +217,8 @@ for (Map<String, Object> event : seatlayer.events().listAll()) {
 ```
 
 Listing events includes live availability `counts` by default, which costs the server one
-round-trip **per event**. `listAll()` turns them off automatically — walking a whole catalogue is
-exactly when you don't want that — and you can control it explicitly:
+round-trip **per event**. `listAll()` turns them off automatically, since walking a whole catalogue is
+exactly when you don't want that, and you can control it explicitly:
 
 ```java
 seatlayer.events().list(EventListOptions.builder().limit(50).counts(false).build());
@@ -226,14 +226,14 @@ seatlayer.events().list(EventListOptions.builder().limit(50).counts(false).build
 
 ## Keeping a hold alive
 
-When an order takes longer than the checkout window — an invoice, a phone sale — extend rather than
+When an order takes longer than the checkout window (an invoice, a phone sale), extend rather than
 release and re-hold. Releasing first hands the seats to whoever is racing for them in between.
 
 ```java
 try {
     seatlayer.inventory().extendHold(eventKey, holdId, 10 * 60_000L);
 } catch (SeatLayerConflictException e) {
-    // Gone, expired, or at its renewal cap — the buyer has to re-pick.
+    // Gone, expired, or at its renewal cap: the buyer has to re-pick.
 }
 ```
 
@@ -278,7 +278,7 @@ public ResponseEntity<Void> handle(
     }
 
     // The signed body carries `at`, but nothing enforces a freshness window, so a
-    // captured delivery stays valid indefinitely. Deduplicate on occurrenceId —
+    // captured delivery stays valid indefinitely. Deduplicate on occurrenceId:
     // this is your replay protection, not an optimisation.
     if (alreadyProcessed((String) event.get("occurrenceId"))) {
         return ResponseEntity.ok().build();
@@ -309,7 +309,7 @@ try {
 }
 ```
 
-Every exception carries `status()`, `code()`, `body()`, and `requestId()` — quote the request id in
+Every exception carries `status()`, `code()`, `body()`, and `requestId()`. Quote the request id in
 support requests. All are unchecked, so they do not force `throws` clauses through your call stack.
 
 ## Reliability
@@ -373,8 +373,8 @@ Full reference: [SeatLayer Java server SDK guide](https://docs.seatlayer.io/serv
 
 Add the [`io.seatlayer:seatlayer-java` artifact](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java),
 construct a `SeatLayer` instance with your secret key, and call `inventory().book(...)` with the
-hold id and a stable `bookingRef`. When your own backend picks the seats — phone orders, box
-office, comps — `inventory().bookBestAvailable(...)` and `inventory().boxOfficeBook(...)` book
+hold id and a stable `bookingRef`. When your own backend picks the seats (phone orders, box
+office, comps), `inventory().bookBestAvailable(...)` and `inventory().boxOfficeBook(...)` book
 outright with no prior hold. A booking reference is required on every booking call, so each sale is
 tied to an immutable order id you can reconcile against later.
 
@@ -393,7 +393,7 @@ retrieve it with `inventory().retrieveHold(...)`, whose item-level price, quanti
 are authoritative, and confirm it with `inventory().book(...)`. Use
 `inventory().extendHold(...)` for a long checkout instead of releasing and re-holding, which would
 hand the seats to whoever is racing for them. Booking is a single automatic attempt: after an
-unknown network outcome you may reconcile and repeat the exact same event, hold, and `bookingRef` —
+unknown network outcome you may reconcile and repeat the exact same event, hold, and `bookingRef`;
 seats already booked under that reference are not sold again.
 
 ### Can I use my own payment provider?
