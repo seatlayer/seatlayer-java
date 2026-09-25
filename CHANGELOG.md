@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0 (2026-09-10)
+
+- Added Event hosting regions: the `EventHostingRegion` enum, a `region` overload on event create, `defaultRegion` on workspace create, and `updateDefaultRegion`. Events created without a region run in Western Europe.
+
 ## 0.7.1 — 2026-09-05
 
 - Clarifies the Maven Central package name and description around Java and
