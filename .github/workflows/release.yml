@@ -3,9 +3,9 @@ name: Release
 # Uploads to Maven Central via the Central Portal.
 #
 # Unlike the other five registries in this fleet, Central has NO Trusted
-# Publishing — there is no OIDC path, so this is the one workflow that needs
-# real stored secrets. Doppler (project seatlayer-release, config prd) is the
-# source of truth; these are operational copies pushed into Actions secrets.
+# Publishing: there is no OIDC path, so this is the one workflow that needs
+# real stored secrets. They are kept in the organization's release secrets
+# store and copied into this repository's Actions secrets.
 #
 # This workflow PUBLISHES. pom.xml sets <autoPublish>true</autoPublish>, so a
 # tag push goes all the way to Central with no human step.
@@ -78,6 +78,6 @@ jobs:
         run: |
           v="${GITHUB_REF_NAME#v}"
           echo "PUBLISHED to Maven Central: io.seatlayer:seatlayer-java:$v"
-          echo "This is permanent — Central versions cannot be replaced or deleted."
+          echo "This is permanent: Central versions cannot be replaced or deleted."
           echo "https://repo1.maven.org/maven2/io/seatlayer/seatlayer-java/$v/"
           echo "Search indexing lags publication by roughly 15-30 minutes."
