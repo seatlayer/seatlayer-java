@@ -93,9 +93,12 @@ The hint is best effort, not a data-residency guarantee. See the
 
 ## Fixed Renewable Seasons
 
-`seatlayer.seasons()` exposes 80 trusted organizer operations: the 48 from
-version `0.7.0`, plus performances, package prices, checkout tests, holders,
-Season orders, hosted renewals, reports, and CSV exports.
+`seatlayer.seasons()` exposes 83 trusted organizer operations: the 48 from
+version `0.7.0`, plus performances, package prices (each price may name a
+`priceTypeKey`: `adult`, `child`, `concession`, `senior` or `student`), checkout
+tests, holders, Season orders, hosted renewals, reports, CSV exports, and the
+bulk refund of a cancelled date (`refundSeasonPerformance`) with its jobs
+(`listSeasonBulkJobs`, `retrieveSeasonBulkJob`).
 
 After the test hold/book/cancel journey and matching webhook deliveries,
 `validateSeasonBuyerRehearsal(seasonKey)` sends no evidence body; SeatLayer
@@ -256,6 +259,8 @@ exactly when you don't want that, and you can control it explicitly:
 seatlayer.events().list(EventListOptions.builder().limit(50).counts(false).build());
 ```
 
+Add `.seriesKey("ser_1")` to list only the dates of one event series.
+
 ## Keeping a hold alive
 
 When an order takes longer than the checkout window (an invoice, a phone sale), extend rather than
@@ -347,18 +352,18 @@ support requests. All are unchecked, so they do not force `throws` clauses throu
 ## Reliability
 
 **Retries and idempotency.** Reads (`GET`/`HEAD`) retry connection failures, 408, 429 and 5xx with
-exponential backoff and full jitter; `Retry-After` wins when the server sends it. Thirty-seven
+exponential backoff and full jitter; `Retry-After` wins when the server sends it. Thirty-eight
 mutations use exact header replay:
 
 - `charts().create`, `charts().copy`, `templates().instantiateTemplate`, `events().create`,
   `workspaces().create`, and `performanceGroups().create`
-- 23 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
+- 24 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
   `updateSeasonPlan`, `deleteSeasonPlan`, `publishSeason`, `duplicateSeasonToLive`,
   `createSeasonHolderImport`, `createSeasonHolderImportFromSeason`, `createSeasonRenewalOffers`,
   `createSeasonAmendment`, `createSeasonPerformances`, `attachSeasonPerformances`,
   `deleteSeasonPerformance`, `markSeasonPerformancePast`, `createSeasonCheckoutTest`,
   `replaceSeasonPackagePrices`, `attachSeasonPlanPerformance`, `deleteSeasonPlanPerformance`,
-  `refundSeasonOrder`, `cancelSeasonOrder`, and `cancelSeasonOrderDate`
+  `refundSeasonOrder`, `cancelSeasonOrder`, `cancelSeasonOrderDate`, and `refundSeasonPerformance`
 - `holders().updateHolder`, `holders().createHolderTransfer`, `holders().createHolderReturn`,
   `orders().refundEventOrder`, and `orders().cancelEventOrder`
 - `eventSeries().createEventSeries`, `eventSeries().addEventSeriesDates`, and
@@ -411,7 +416,7 @@ outbox, and support operations.
 | `webhooks()` | `list` `create` `update` `delete` `listDeliveries` |
 | `workspaces()` | `list` `create` `retrieve` `update` |
 | `performanceGroups()` | `list` `create` `retrieve` `delete` `activate` `close` `retrieveLifecycle` `createBuyerAccessSession` `listBuyerAccessSessions` `revokeBuyerAccessSession` `retrieveHold` `bookHold` `retrieveBooking` |
-| `seasons()` | 80 operations for catalogue and Plan lifecycle, performances, package prices, sales windows, checkout tests, buyer access and booking, holders and holder imports, Season orders, renewals and hosted renewals, occurrence returns and amendments, reports and CSV exports, audit, outbox, and support export |
+| `seasons()` | 83 operations for catalogue and Plan lifecycle, performances, package prices, sales windows, checkout tests, buyer access and booking, holders and holder imports, Season orders, renewals and hosted renewals, occurrence returns and amendments, bulk refunds and jobs, reports and CSV exports, audit, outbox, and support export |
 
 Full reference: [SeatLayer Java server SDK guide](https://docs.seatlayer.io/server-sdk/java/)
 

@@ -318,6 +318,24 @@ final class SeasonPlatformTest {
     }
 
     @Test
+    void bulkRefundOfADateRetriesWithOneKey() {
+        String job = "{\"job\":{\"jobId\":\"sbj_1\",\"kind\":\"bulk_refund\",\"state\":\"planning\"}}";
+        SeatLayer sdk = client(List.of(
+                rateLimited(),
+                new SeatLayerHttpClient.Response(202, job, Map.of())));
+
+        Map<String, Object> result = sdk.seasons().refundSeasonPerformance(
+                "sea_1", "ev_1", Map.of("amount", "full"), null);
+
+        assertEquals(Json.read(job), result);
+        assertCalls(List.of(
+                new Expected("POST /v1/seasons/sea_1/performances/ev_1/refunds", "{\"amount\":\"full\"}", true),
+                new Expected("POST /v1/seasons/sea_1/performances/ev_1/refunds", "{\"amount\":\"full\"}", true)));
+        assertEquals(
+                calls.get(0).headers().get("Idempotency-Key"), calls.get(1).headers().get("Idempotency-Key"));
+    }
+
+    @Test
     void holderReturnRetriesWithOneKey() {
         String created = "{\"return\":{\"returnId\":\"ret_1\",\"state\":\"returned\","
                 + "\"seasonKey\":\"sea_1\",\"tickets\":[],\"createdAt\":1}}";

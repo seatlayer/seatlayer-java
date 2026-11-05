@@ -50,6 +50,20 @@ public final class Seasons {
         return http.get(path(seasonKey, ""));
     }
 
+    /**
+     * Renames a draft Season, or sets how it sells.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param params the request body: {@code expectedRevision}, plus any of {@code name},
+     *     {@code edition}, {@code checkoutMode} ({@code seatlayer} or {@code server}; it cannot go
+     *     back to undecided and is fixed once a live booking exists), {@code transferCutoffHours}
+     *     and {@code returnCutoffHours} (hours before a date starts, 0 to 720, or {@code null} for
+     *     until it starts)
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
     public Map<String, Object> updateSeason(
             String seasonKey, Map<String, Object> params, String idempotencyKey) {
         return http.mutationWithHeaderReplay("PATCH", path(seasonKey, ""), params, idempotencyKey);
@@ -139,6 +153,13 @@ public final class Seasons {
         return http.delete(path(seasonKey, "/buyer-access-sessions/" + encode(sessionId)));
     }
 
+    /**
+     * Retrieves a Season hold. Each seat carries the {@code priceTypeKey} it is held as.
+     *
+     * @param seasonKey the Season key
+     * @param operationId the hold operation id
+     * @return the decoded response
+     */
     public Map<String, Object> retrieveSeasonHold(String seasonKey, String operationId) {
         return http.get(path(seasonKey, "/holds/" + encode(operationId)));
     }
@@ -174,6 +195,19 @@ public final class Seasons {
         return http.post(path(seasonKey, "/buyer-rehearsals/validate"));
     }
 
+    /**
+     * Imports incumbent holders, as a dry run or for real.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param params the request body: {@code successorPlanActivationId}, {@code rows} and optionally
+     *     {@code dryRun}; each row takes {@code rowId}, {@code holderRef},
+     *     {@code priorPlanActivationId}, {@code priorContractRef} and {@code labels}, plus optional
+     *     {@code existingBookingRef}, {@code holderEmail} and {@code holderName}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
     public Map<String, Object> createSeasonHolderImport(
             String seasonKey, Map<String, Object> params, String idempotencyKey) {
         return http.postWithHeaderReplay(path(seasonKey, "/imports"), params, idempotencyKey);
@@ -193,6 +227,13 @@ public final class Seasons {
         return http.get(path(seasonKey, "/renewal-offers"));
     }
 
+    /**
+     * Retrieves a renewal offer, with its {@code seats} and the {@code priceTypeKey} each renews at.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @return the decoded response
+     */
     public Map<String, Object> retrieveSeasonRenewalOffer(String seasonKey, String offerId) {
         return http.get(path(seasonKey, "/renewal-offers/" + encode(offerId)));
     }
@@ -204,6 +245,13 @@ public final class Seasons {
                 body("deadlineAt", deadlineAt));
     }
 
+    /**
+     * Inspects a renewal offer, with its {@code seats} and the {@code priceTypeKey} each renews at.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @return the decoded response
+     */
     public Map<String, Object> inspectSeasonRenewalOffer(String seasonKey, String offerId) {
         return http.get(path(seasonKey, "/renewal-offers/" + encode(offerId) + "/inspect"));
     }
@@ -238,6 +286,20 @@ public final class Seasons {
         return http.get(path(seasonKey, "/occurrences"));
     }
 
+    /**
+     * Amends one date of a published Season.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param params the request body: {@code eventKey} and {@code kind} ({@code reschedule},
+     *     {@code replace}, {@code cancel_exception}, {@code postpone} or {@code cancel}), plus
+     *     optional {@code startsAt}, {@code name}, {@code planActivationId}, and, with
+     *     {@code cancel} only, {@code refund} ({@code none}, {@code per_date} or {@code full}) and
+     *     {@code reason}; a refunding cancel answers with its {@code refundJob}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
     public Map<String, Object> createSeasonAmendment(
             String seasonKey, Map<String, Object> params, String idempotencyKey) {
         return http.postWithHeaderReplay(path(seasonKey, "/amendments"), params, idempotencyKey);
@@ -447,7 +509,10 @@ public final class Seasons {
      *
      * @param seasonKey the Season key
      * @param planKey the package (Plan) key
-     * @param params the request body: {@code prices}, and optionally {@code currency}
+     * @param params the request body: {@code prices}, and optionally {@code currency}; each price
+     *     takes {@code categoryKey}, {@code unitPrice} and an optional {@code priceTypeKey}
+     *     ({@code adult}, the default, {@code child}, {@code concession}, {@code senior} or
+     *     {@code student})
      * @param idempotencyKey a stable key, or {@code null} to generate one
      * @return the decoded response
      */
@@ -458,7 +523,8 @@ public final class Seasons {
     }
 
     /**
-     * Lists every package price table for the Season.
+     * Lists every package price table for the Season. Each price carries its
+     * {@code priceTypeKey} and {@code priceTypeLabel}.
      *
      * @param seasonKey the Season key
      * @return the decoded response
@@ -834,5 +900,45 @@ public final class Seasons {
      */
     public Map<String, Object> retrieveSeasonSeatCounts(String seasonKey) {
         return http.get(path(seasonKey, "/seat-counts"));
+    }
+
+    /**
+     * Refunds every SeatLayer order holding a cancelled date, as a job. Follow it with
+     * {@link #retrieveSeasonBulkJob}.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry and replays the same job.
+     *
+     * @param seasonKey the Season key
+     * @param eventKey the cancelled date's Event key
+     * @param params the request body: {@code amount} ({@code per_date}, the date's share of each
+     *     order, or {@code full}, what is left of each order) and optionally {@code reason}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response, with the {@code job}
+     */
+    public Map<String, Object> refundSeasonPerformance(
+            String seasonKey, String eventKey, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/performances/" + encode(eventKey) + "/refunds"), params, idempotencyKey);
+    }
+
+    /**
+     * Lists the Season's bulk jobs, newest first (100 at most).
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response, with the {@code jobs}
+     */
+    public Map<String, Object> listSeasonBulkJobs(String seasonKey) {
+        return http.get(path(seasonKey, "/jobs"));
+    }
+
+    /**
+     * Retrieves one bulk job with its counts and up to 500 failed items.
+     *
+     * @param seasonKey the Season key
+     * @param jobId the job id
+     * @return the decoded response, with the {@code job}
+     */
+    public Map<String, Object> retrieveSeasonBulkJob(String seasonKey, String jobId) {
+        return http.get(path(seasonKey, "/jobs/" + encode(jobId)));
     }
 }

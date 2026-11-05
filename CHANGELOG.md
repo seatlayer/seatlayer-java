@@ -2,10 +2,10 @@
 
 ## Unreleased
 
-- Added 32 Season operations to `seasons()`, for 80 in all: performances, package prices, plan
+- Added 35 Season operations to `seasons()`, for 83 in all: performances, package prices, plan
   edits and deletion, one-call publish, checkout tests, occurrence returns and reclaims, holders,
   Season order refunds and cancellations, hosted renewals, renewal links and notices, sales and
-  seat reports, seat counts, and holder and order CSV exports.
+  seat reports, seat counts, holder and order CSV exports, and bulk refunds with their jobs.
 - Added `holders()` (customers, holder reads and updates, sign-out, seasons, tickets, and ticket
   transfers), `orders()` (orders across events and seasons, one event's orders, CSV export,
   refunds, cancellations, and ticket emails), and `eventSeries()` (create, list, retrieve, add
@@ -15,8 +15,17 @@
   preflight and transition, booking fee, and discount codes.
 - The three CSV exports return the CSV text as a `String`. `deleteSeasonPlan` and
   `deleteEventDiscountCode` return nothing (the API answers 204).
-- 23 of the new operations use header replay, with one `Idempotency-Key` reused on every retry.
-  The other 49 are single-attempt and send no key.
+- 24 of the new operations use header replay, with one `Idempotency-Key` reused on every retry.
+  The other 51 are single-attempt and send no key.
+- Added `seasons().refundSeasonPerformance` (refund every order of a cancelled date as a job, with
+  header replay), `seasons().listSeasonBulkJobs`, and `seasons().retrieveSeasonBulkJob`.
+- Documented the new request fields the `Map` bodies carry: `priceTypeKey` on each
+  `replaceSeasonPackagePrices` price; `checkoutMode`, `transferCutoffHours` and
+  `returnCutoffHours` on `updateSeason`; `holderEmail` and `holderName` on each
+  `createSeasonHolderImport` row; and `kind` `postpone` or `cancel`, with `refund` and `reason`, on
+  `createSeasonAmendment`.
+- `EventListOptions` takes `seriesKey` (builder `seriesKey(...)`) to list one event series' dates;
+  the five-argument constructor stays.
 
 ## 0.8.0 (2026-09-10)
 

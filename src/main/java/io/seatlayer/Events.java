@@ -32,6 +32,7 @@ public final class Events {
         if (!options.counts()) {
             query.put("counts", "0");
         }
+        query.put("seriesKey", options.seriesKey());
         return Page.of(http.get("/v1/events", query), "events");
     }
 

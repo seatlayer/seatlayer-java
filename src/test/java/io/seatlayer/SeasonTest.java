@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,7 @@ final class SeasonTest {
     }
 
     @Test
-    void mapsAll80SeasonOperationsAndReplayClasses() {
+    void mapsAll83SeasonOperationsAndReplayClasses() {
         List<Call> calls = new ArrayList<>();
         SeatLayer sdk = SeatLayer.builder()
                 .secretKey("sk_test_abc")
@@ -118,8 +119,12 @@ final class SeasonTest {
         String holdersCsv = seasons.exportSeasonHoldersCsv(key, "ann", "active");
         String ordersCsv = seasons.exportSeasonOrdersCsv(key);
         seasons.retrieveSeasonSeatCounts(key);
+        seasons.refundSeasonPerformance(
+                key, "ev/1", Map.of("amount", "per_date", "reason", "Storm"), "refund-date-1");
+        seasons.listSeasonBulkJobs(key);
+        seasons.retrieveSeasonBulkJob(key, "job/1");
 
-        assertEquals(80, calls.size());
+        assertEquals(83, calls.size());
         assertEquals("{}", holdersCsv);
         assertEquals("{}", ordersCsv);
         assertNull(calls.get(26).body());
@@ -189,7 +194,10 @@ final class SeasonTest {
                 "GET /v1/seasons/sea%2Fa/reports/seats",
                 "GET /v1/seasons/sea%2Fa/reports/holders.csv?q=ann&status=active",
                 "GET /v1/seasons/sea%2Fa/reports/orders.csv",
-                "GET /v1/seasons/sea%2Fa/seat-counts");
+                "GET /v1/seasons/sea%2Fa/seat-counts",
+                "POST /v1/seasons/sea%2Fa/performances/ev%2F1/refunds",
+                "GET /v1/seasons/sea%2Fa/jobs",
+                "GET /v1/seasons/sea%2Fa/jobs/job%2F1");
         List<String> actual = calls.stream()
                 .map(call -> call.method() + " " + call.url().substring("https://api.seatlayer.io".length()))
                 .toList();
@@ -197,7 +205,7 @@ final class SeasonTest {
 
         List<Integer> replayIndexes = List.of(
                 2, 4, 5, 10, 18, 27, 29, 38,
-                48, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 66, 67, 68);
+                48, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 66, 67, 68, 80);
         for (int index = 0; index < calls.size(); index++) {
             if (replayIndexes.contains(index)) {
                 assertTrue(calls.get(index).headers().containsKey("Idempotency-Key"));
@@ -208,8 +216,9 @@ final class SeasonTest {
         assertEquals("from-1", calls.get(48).headers().get("Idempotency-Key"));
         assertEquals("plan-del-1", calls.get(54).headers().get("Idempotency-Key"));
         assertEquals("cancel-date-1", calls.get(68).headers().get("Idempotency-Key"));
+        assertEquals("refund-date-1", calls.get(80).headers().get("Idempotency-Key"));
 
-        // JSON bodies of the 32 operations added after the first 48, in call order; null means no body.
+        // JSON bodies of the 35 operations added after the first 48, in call order; null means no body.
         List<String> addedBodies = Arrays.asList(
                 "{\"sourceSeasonId\":\"sea_2026\",\"successorPlanActivationId\":\"pa_1\"}",
                 null,
@@ -244,8 +253,11 @@ final class SeasonTest {
                 null,
                 null,
                 null,
+                null,
+                "{\"amount\":\"per_date\",\"reason\":\"Storm\"}",
+                null,
                 null);
-        assertEquals(32, addedBodies.size());
+        assertEquals(35, addedBodies.size());
         for (int offset = 0; offset < addedBodies.size(); offset++) {
             Call call = calls.get(48 + offset);
             String label = "call " + (48 + offset) + " " + expected.get(48 + offset);
@@ -256,5 +268,54 @@ final class SeasonTest {
             }
         }
         assertTrue(calls.get(77).headers().get("Accept").startsWith("text/csv"));
+    }
+
+    @Test
+    void priceTypesSaleSettingsHolderContactsAndDateCancelsReachTheWire() {
+        List<Call> calls = new ArrayList<>();
+        SeatLayer sdk = SeatLayer.builder()
+                .secretKey("sk_test_abc")
+                .transport((method, url, headers, requestBody) -> {
+                    calls.add(new Call(method, url, Map.copyOf(headers), requestBody));
+                    return new SeatLayerHttpClient.Response(200, "{}", Map.of());
+                })
+                .build();
+        Seasons seasons = sdk.seasons();
+        Map<String, Object> clearReturnCutoff = new LinkedHashMap<>();
+        clearReturnCutoff.put("expectedRevision", 3);
+        clearReturnCutoff.put("checkoutMode", "seatlayer");
+        clearReturnCutoff.put("transferCutoffHours", 24);
+        clearReturnCutoff.put("returnCutoffHours", null);
+
+        seasons.replaceSeasonPackagePrices("sea_1", "plan_1", Map.of("prices", List.of(
+                Map.of("categoryKey", "stalls", "unitPrice", 18000),
+                Map.of("categoryKey", "stalls", "priceTypeKey", "child", "unitPrice", 9000))), null);
+        seasons.updateSeason("sea_1", clearReturnCutoff, null);
+        seasons.createSeasonHolderImport("sea_1", Map.of(
+                "successorPlanActivationId", "pa_1",
+                "rows", List.of(Map.of(
+                        "rowId", "r1", "holderRef", "h1", "priorPlanActivationId", "pa_0",
+                        "priorContractRef", "c1", "labels", List.of("A-1"),
+                        "holderEmail", "ana@example.com", "holderName", "Ana Silva"))), null);
+        seasons.createSeasonAmendment("sea_1", Map.of(
+                "eventKey", "ev_night_3", "kind", "cancel", "refund", "per_date", "reason", "Storm"),
+                "night-3-storm");
+
+        List<String> bodies = List.of(
+                "{\"prices\":[{\"categoryKey\":\"stalls\",\"unitPrice\":18000},"
+                        + "{\"categoryKey\":\"stalls\",\"priceTypeKey\":\"child\",\"unitPrice\":9000}]}",
+                "{\"expectedRevision\":3,\"checkoutMode\":\"seatlayer\",\"transferCutoffHours\":24,"
+                        + "\"returnCutoffHours\":null}",
+                "{\"successorPlanActivationId\":\"pa_1\",\"rows\":[{\"rowId\":\"r1\",\"holderRef\":\"h1\","
+                        + "\"priorPlanActivationId\":\"pa_0\",\"priorContractRef\":\"c1\",\"labels\":[\"A-1\"],"
+                        + "\"holderEmail\":\"ana@example.com\",\"holderName\":\"Ana Silva\"}]}",
+                "{\"eventKey\":\"ev_night_3\",\"kind\":\"cancel\",\"refund\":\"per_date\",\"reason\":\"Storm\"}");
+        assertEquals(bodies.size(), calls.size());
+        for (int index = 0; index < bodies.size(); index++) {
+            assertEquals(Json.read(bodies.get(index)), Json.read(calls.get(index).body()), "call " + index);
+            assertTrue(calls.get(index).headers().containsKey("Idempotency-Key"), "call " + index);
+        }
+        assertTrue(calls.get(1).body().contains("\"returnCutoffHours\":null"));
+        assertEquals("night-3-storm", calls.get(3).headers().get("Idempotency-Key"));
     }
 }
