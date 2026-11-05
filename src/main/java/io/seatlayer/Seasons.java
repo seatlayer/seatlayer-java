@@ -60,7 +60,8 @@ public final class Seasons {
      *     {@code edition}, {@code checkoutMode} ({@code seatlayer} or {@code server}; it cannot go
      *     back to undecided and is fixed once a live booking exists), {@code transferCutoffHours}
      *     and {@code returnCutoffHours} (hours before a date starts, 0 to 720, or {@code null} for
-     *     until it starts)
+     *     until it starts), and {@code audience} ({@code embed_only} or {@code public}; an ended
+     *     Season cannot become public, {@code 409 sales_ended})
      * @param idempotencyKey a stable key, or {@code null} to generate one
      * @return the decoded response
      */
@@ -117,6 +118,16 @@ public final class Seasons {
                 path(seasonKey, "/sales/" + action), body("expectedRevision", expectedRevision));
     }
 
+    /**
+     * Opens sales. The answer's {@code warnings} say what is advised but not required, such as
+     * {@code checkout_test_missing} until a checkout test or rehearsal has passed. Refused with
+     * {@code 409 plan_not_published} or {@code 409 checkout_mode_not_chosen} until a package is
+     * published and a checkout mode is chosen.
+     *
+     * @param seasonKey the Season key
+     * @param expectedRevision the Season revision the caller last read
+     * @return the decoded response, with {@code season} and {@code warnings}
+     */
     public Map<String, Object> openSeasonSales(String seasonKey, int expectedRevision) {
         return sales(seasonKey, "open", expectedRevision);
     }
@@ -321,8 +332,9 @@ public final class Seasons {
      * @param params the request body: {@code eventKey} and {@code kind} ({@code reschedule},
      *     {@code replace}, {@code cancel_exception}, {@code postpone} or {@code cancel}), plus
      *     optional {@code startsAt}, {@code name}, {@code planActivationId}, and, with
-     *     {@code cancel} only, {@code refund} ({@code none}, {@code per_date} or {@code full}) and
-     *     {@code reason}; a refunding cancel answers with its {@code refundJob}
+     *     {@code cancel} only, {@code refund} ({@code none} or {@code per_date}, each order's
+     *     share of the date; a whole-order refund is the order refund) and {@code reason}; a
+     *     refunding cancel answers with its {@code refundJob}
      * @param idempotencyKey a stable key, or {@code null} to generate one
      * @return the decoded response
      */
@@ -985,7 +997,8 @@ public final class Seasons {
      * @param seasonKey the Season key
      * @param eventKey the cancelled date's Event key
      * @param params the request body: {@code amount} ({@code per_date}, the date's share of each
-     *     order, or {@code full}, what is left of each order) and optionally {@code reason}
+     *     order; {@code full} is refused with {@code 422 date_refund_per_date_only}, so refund a
+     *     whole order with the order refund) and optionally {@code reason}
      * @param idempotencyKey a stable key, or {@code null} to generate one
      * @return the decoded response, with the {@code job}
      */

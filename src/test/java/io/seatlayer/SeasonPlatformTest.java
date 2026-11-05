@@ -168,6 +168,7 @@ final class SeasonPlatformTest {
                 "ev/1", "ord/1", Map.of("reason", "event_cancelled", "notifyBuyer", true), "event-cancel-1");
         orders.resendEventOrderTickets("ev/1", "ord/1");
         orders.resendEventOrderTickets("ev/1", "ord/1", Map.of("email", "fan@example.com"));
+        orders.listOrders(null, null, "ord/1", null, null, null, null, null);
 
         String order = "/v1/events/ev%2F1/orders/ord%2F1";
         assertCalls(List.of(
@@ -193,7 +194,8 @@ final class SeasonPlatformTest {
                         "POST " + order + "/cancel",
                         "{\"reason\":\"event_cancelled\",\"notifyBuyer\":true}", true),
                 new Expected("POST " + order + "/resend", null, false),
-                new Expected("POST " + order + "/resend", "{\"email\":\"fan@example.com\"}", false)));
+                new Expected("POST " + order + "/resend", "{\"email\":\"fan@example.com\"}", false),
+                new Expected("GET /v1/orders?holderRef=ord%2F1", null, false)));
         assertEquals("event-refund-1", calls.get(8).headers().get("Idempotency-Key"));
         assertEquals("event-cancel-1", calls.get(10).headers().get("Idempotency-Key"));
     }
@@ -266,6 +268,7 @@ final class SeasonPlatformTest {
         series.retrieveEventSeries("ev/1");
         series.addEventSeriesDates("ev/1", Map.of("dates", List.of("2027-06-01T19:30")), null);
         series.updateEventSeries("ev/1", Map.of("name", "Summer nights 2027"), "series-update-1");
+        series.addEventSeriesDates("ev/1", Map.of("retryFailed", true), null);
 
         assertCalls(List.of(
                 new Expected(
@@ -278,7 +281,8 @@ final class SeasonPlatformTest {
                 new Expected("GET /v1/event-series/ev%2F1", null, false),
                 new Expected(
                         "POST /v1/event-series/ev%2F1/dates", "{\"dates\":[\"2027-06-01T19:30\"]}", true),
-                new Expected("PATCH /v1/event-series/ev%2F1", "{\"name\":\"Summer nights 2027\"}", true)));
+                new Expected("PATCH /v1/event-series/ev%2F1", "{\"name\":\"Summer nights 2027\"}", true),
+                new Expected("POST /v1/event-series/ev%2F1/dates", "{\"retryFailed\":true}", true)));
         assertEquals("series-1", calls.get(0).headers().get("Idempotency-Key"));
         assertEquals("series-update-1", calls.get(5).headers().get("Idempotency-Key"));
     }
@@ -340,12 +344,12 @@ final class SeasonPlatformTest {
                 new SeatLayerHttpClient.Response(202, job, Map.of())));
 
         Map<String, Object> result = sdk.seasons().refundSeasonPerformance(
-                "sea_1", "ev_1", Map.of("amount", "full"), null);
+                "sea_1", "ev_1", Map.of("amount", "per_date"), null);
 
         assertEquals(Json.read(job), result);
         assertCalls(List.of(
-                new Expected("POST /v1/seasons/sea_1/performances/ev_1/refunds", "{\"amount\":\"full\"}", true),
-                new Expected("POST /v1/seasons/sea_1/performances/ev_1/refunds", "{\"amount\":\"full\"}", true)));
+                new Expected("POST /v1/seasons/sea_1/performances/ev_1/refunds", "{\"amount\":\"per_date\"}", true),
+                new Expected("POST /v1/seasons/sea_1/performances/ev_1/refunds", "{\"amount\":\"per_date\"}", true)));
         assertEquals(
                 calls.get(0).headers().get("Idempotency-Key"), calls.get(1).headers().get("Idempotency-Key"));
     }

@@ -25,7 +25,7 @@ public final class Orders {
      * @return the decoded response
      */
     public Map<String, Object> listOrders() {
-        return listOrders(null, null, null, null, null, null, null);
+        return listOrders(null, null, null, null, null, null, null, null);
     }
 
     /**
@@ -48,11 +48,40 @@ public final class Orders {
             Long to,
             String cursor,
             Integer limit) {
+        return listOrders(eventKey, seasonKey, null, status, from, to, cursor, limit);
+    }
+
+    /**
+     * Lists orders across events and seasons, optionally one holder's. Null filters are not sent.
+     * Each order carries {@code holderRef} and {@code customerId}; {@code buyer.email} is null for
+     * a box office sale taken without one.
+     *
+     * @param eventKey only this event's orders, or {@code null}
+     * @param seasonKey only this Season's orders, renewals included, or {@code null}
+     * @param holderRef only this holder's orders (the Season order with this id and renewals
+     *     offered to this reference), or {@code null}
+     * @param status only orders in this state, or {@code null}
+     * @param from created at or after this time, in epoch milliseconds, or {@code null}
+     * @param to created before this time, in epoch milliseconds, or {@code null}
+     * @param cursor the cursor from the previous page, or {@code null}
+     * @param limit the page size, or {@code null} for the server default
+     * @return the decoded response
+     */
+    public Map<String, Object> listOrders(
+            String eventKey,
+            String seasonKey,
+            String holderRef,
+            String status,
+            Long from,
+            Long to,
+            String cursor,
+            Integer limit) {
         return http.get(
                 "/v1/orders",
                 body(
                         "eventKey", eventKey,
                         "seasonKey", seasonKey,
+                        "holderRef", holderRef,
                         "status", status,
                         "from", from,
                         "to", to,

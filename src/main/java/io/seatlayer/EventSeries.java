@@ -73,7 +73,10 @@ public final class EventSeries {
      * <p>Header replay: the same idempotency key is reused on every retry.
      *
      * @param eventKey the series' event key
-     * @param params the request body: either {@code schedule} or {@code dates}
+     * @param params the request body: one of {@code schedule}, {@code dates}, or
+     *     {@code retryFailed: true} to make again every date that failed to be made (up to 100;
+     *     {@code 422 nothing_to_retry} when none did, {@code 409 series_busy} while another change
+     *     runs)
      * @param idempotencyKey a stable key, or {@code null} to generate one
      * @return the decoded response
      */
