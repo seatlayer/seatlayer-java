@@ -93,12 +93,13 @@ The hint is best effort, not a data-residency guarantee. See the
 
 ## Fixed Renewable Seasons
 
-`seatlayer.seasons()` exposes 86 trusted organizer operations: the 48 from
+`seatlayer.seasons()` exposes 87 trusted organizer operations: the 48 from
 version `0.7.0`, plus performances, package prices (each price may name a
 `priceTypeKey`: `adult`, `child`, `concession`, `senior` or `student`), checkout
 tests, holders, Season orders, hosted renewals, renewal quotes, intents and
 checkouts, reports, CSV exports, and the
-bulk refund of a cancelled date (`refundSeasonPerformance`) with its jobs
+bulk refund of a cancelled date (`refundSeasonPerformance`) and the release of
+lapsed renewal offers (`releaseSeasonLapsedOffers`) with their jobs
 (`listSeasonBulkJobs`, `retrieveSeasonBulkJob`).
 
 After the test hold/book/cancel journey and matching webhook deliveries,
@@ -372,19 +373,19 @@ support requests. All are unchecked, so they do not force `throws` clauses throu
 ## Reliability
 
 **Retries and idempotency.** Reads (`GET`/`HEAD`) retry connection failures, 408, 429 and 5xx with
-exponential backoff and full jitter; `Retry-After` wins when the server sends it. Forty
+exponential backoff and full jitter; `Retry-After` wins when the server sends it. Forty-one
 mutations use exact header replay:
 
 - `charts().create`, `charts().copy`, `templates().instantiateTemplate`, `events().create`,
   `workspaces().create`, and `performanceGroups().create`
-- 25 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
+- 26 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
   `updateSeasonPlan`, `deleteSeasonPlan`, `publishSeason`, `duplicateSeasonToLive`,
   `createSeasonHolderImport`, `createSeasonHolderImportFromSeason`, `createSeasonRenewalOffers`,
   `createSeasonAmendment`, `createSeasonPerformances`, `attachSeasonPerformances`,
   `deleteSeasonPerformance`, `markSeasonPerformancePast`, `createSeasonCheckoutTest`,
   `replaceSeasonPackagePrices`, `attachSeasonPlanPerformance`, `deleteSeasonPlanPerformance`,
-  `refundSeasonOrder`, `cancelSeasonOrder`, `cancelSeasonOrderDate`, `refundSeasonPerformance`, and
-  `createSeasonRenewalCheckout`
+  `refundSeasonOrder`, `cancelSeasonOrder`, `cancelSeasonOrderDate`, `refundSeasonPerformance`,
+  `releaseSeasonLapsedOffers`, and `createSeasonRenewalCheckout`
 - `holders().updateHolder`, `holders().createHolderTransfer`, `holders().createHolderReturn`,
   `holders().createHolderRenewalCheckout`, `orders().refundEventOrder`, and
   `orders().cancelEventOrder`
@@ -438,7 +439,7 @@ outbox, and support operations.
 | `webhooks()` | `list` `create` `update` `delete` `listDeliveries` |
 | `workspaces()` | `list` `create` `retrieve` `update` |
 | `performanceGroups()` | `list` `create` `retrieve` `delete` `activate` `close` `retrieveLifecycle` `createBuyerAccessSession` `listBuyerAccessSessions` `revokeBuyerAccessSession` `retrieveHold` `bookHold` `retrieveBooking` |
-| `seasons()` | 86 operations for catalogue and Plan lifecycle, performances, package prices, sales windows, checkout tests, buyer access and booking, holders and holder imports, Season orders, renewals, hosted renewals and renewal checkouts, occurrence returns and amendments, bulk refunds and jobs, reports and CSV exports, audit, outbox, and support export |
+| `seasons()` | 87 operations for catalogue and Plan lifecycle, performances, package prices, sales windows, checkout tests, buyer access and booking, holders and holder imports, Season orders, renewals, hosted renewals and renewal checkouts, occurrence returns and amendments, bulk refunds, lapsed offer releases and jobs, reports and CSV exports, audit, outbox, and support export |
 
 Full reference: [SeatLayer Java server SDK guide](https://docs.seatlayer.io/server-sdk/java/)
 

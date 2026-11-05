@@ -355,6 +355,74 @@ final class SeasonPlatformTest {
     }
 
     @Test
+    void lapsedOfferReleaseRetriesWithOneKeyGeneratedOrGiven() {
+        String job = "{\"job\":{\"jobId\":\"sbj_2\",\"kind\":\"lapsed_release\",\"state\":\"planning\"}}";
+        SeatLayer sdk = client(List.of(
+                rateLimited(),
+                new SeatLayerHttpClient.Response(202, job, Map.of()),
+                rateLimited(),
+                new SeatLayerHttpClient.Response(202, job, Map.of())));
+
+        Map<String, Object> result = sdk.seasons().releaseSeasonLapsedOffers("sea/a", null);
+        sdk.seasons().releaseSeasonLapsedOffers("sea_1", "release-1");
+
+        assertEquals(Json.read(job), result);
+        assertCalls(List.of(
+                new Expected("POST /v1/seasons/sea%2Fa/renewal-offers/release-lapsed", null, true),
+                new Expected("POST /v1/seasons/sea%2Fa/renewal-offers/release-lapsed", null, true),
+                new Expected("POST /v1/seasons/sea_1/renewal-offers/release-lapsed", null, true),
+                new Expected("POST /v1/seasons/sea_1/renewal-offers/release-lapsed", null, true)));
+        assertEquals(
+                calls.get(0).headers().get("Idempotency-Key"), calls.get(1).headers().get("Idempotency-Key"));
+        assertEquals("release-1", calls.get(2).headers().get("Idempotency-Key"));
+        assertEquals("release-1", calls.get(3).headers().get("Idempotency-Key"));
+    }
+
+    @Test
+    void renewalOfferPagesSendCursorAndLimit() {
+        SeatLayer sdk = client("{\"offers\":[],\"nextCursor\":null}");
+
+        Map<String, Object> hosted = sdk.seasons().retrieveSeasonHostedRenewals("sea/a", "c/1", 500);
+        sdk.seasons().listSeasonRenewalOffers("sea/a", "c/2", 100);
+        sdk.seasons().retrieveSeasonHostedRenewals("sea_1", null, 25);
+        sdk.seasons().listSeasonRenewalOffers("sea_1", null, null);
+
+        assertTrue(hosted.containsKey("nextCursor"));
+        assertNull(hosted.get("nextCursor"));
+        assertCalls(List.of(
+                new Expected("GET /v1/seasons/sea%2Fa/renewal-hosted?cursor=c%2F1&limit=500", null, false),
+                new Expected("GET /v1/seasons/sea%2Fa/renewal-offers?cursor=c%2F2&limit=100", null, false),
+                new Expected("GET /v1/seasons/sea_1/renewal-hosted?limit=25", null, false),
+                new Expected("GET /v1/seasons/sea_1/renewal-offers", null, false)));
+    }
+
+    @Test
+    void renewalRunAndBringAcrossAnswerAJobAbove100() {
+        String renewalRun = "{\"job\":{\"jobId\":\"sbj_3\",\"kind\":\"renewal_run\",\"state\":\"planning\"},"
+                + "\"batchId\":\"srb_1\"}";
+        String holderImport = "{\"job\":{\"jobId\":\"sbj_4\",\"kind\":\"holder_import\",\"state\":\"planning\"}}";
+        SeatLayer sdk = client(List.of(
+                new SeatLayerHttpClient.Response(202, renewalRun, Map.of()),
+                new SeatLayerHttpClient.Response(202, holderImport, Map.of())));
+
+        Map<String, Object> offers = sdk.seasons().createSeasonRenewalOffers(
+                "sea_1", Map.of("deadlineAt", 123), "offers-1");
+        Map<String, Object> imported = sdk.seasons().createSeasonHolderImportFromSeason(
+                "sea_1", Map.of("sourceSeasonId", "sea_0", "successorPlanActivationId", "pa_1"), "from-1");
+
+        assertEquals("srb_1", offers.get("batchId"));
+        assertEquals(Json.read(renewalRun), offers);
+        assertNull(offers.get("offers"));
+        assertEquals(Json.read(holderImport), imported);
+        assertNull(imported.get("import"));
+        assertCalls(List.of(
+                new Expected("POST /v1/seasons/sea_1/renewal-offers", "{\"deadlineAt\":123}", true),
+                new Expected(
+                        "POST /v1/seasons/sea_1/imports/from-season",
+                        "{\"sourceSeasonId\":\"sea_0\",\"successorPlanActivationId\":\"pa_1\"}", true)));
+    }
+
+    @Test
     void holderReturnRetriesWithOneKey() {
         String created = "{\"return\":{\"returnId\":\"ret_1\",\"state\":\"returned\","
                 + "\"seasonKey\":\"sea_1\",\"tickets\":[],\"createdAt\":1}}";

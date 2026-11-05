@@ -228,14 +228,50 @@ public final class Seasons {
         return http.get(path(seasonKey, "/imports/" + encode(importId)));
     }
 
+    /**
+     * Makes one renewal offer per eligible prior Contract.
+     *
+     * <p>For 100 contracts or fewer the offers are made in this call: {@code 201} with the
+     * {@code offers}. For more than 100, a {@code renewal_run} job makes them: {@code 202} with the
+     * {@code job} and its {@code batchId}. Follow the job with {@link #retrieveSeasonBulkJob},
+     * then read the offers with {@link #listSeasonRenewalOffers(String, String, Integer)}. Can
+     * refuse with {@code 409 job_mismatch} or {@code 503 season_not_configured}.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry and answers the same job.
+     *
+     * @param seasonKey the Season key
+     * @param params the request body: {@code deadlineAt}, and optionally
+     *     {@code successorPlanActivationId} and {@code contractIds}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response: the {@code offers}, or the {@code job} and {@code batchId}
+     */
     public Map<String, Object> createSeasonRenewalOffers(
             String seasonKey, Map<String, Object> params, String idempotencyKey) {
         return http.postWithHeaderReplay(
                 path(seasonKey, "/renewal-offers"), params, idempotencyKey);
     }
 
+    /**
+     * Lists the first page of renewal offers, newest first.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response, with the {@code offers} and {@code nextCursor}
+     */
     public Map<String, Object> listSeasonRenewalOffers(String seasonKey) {
-        return http.get(path(seasonKey, "/renewal-offers"));
+        return listSeasonRenewalOffers(seasonKey, null, null);
+    }
+
+    /**
+     * Lists renewal offers, one page at a time, newest first. Null arguments are not sent.
+     *
+     * @param seasonKey the Season key
+     * @param cursor the {@code nextCursor} from the previous page, or {@code null}
+     * @param limit offers a page, 1-100, or {@code null} for 100
+     * @return the decoded response, with the {@code offers} and {@code nextCursor} (null on the
+     *     last page)
+     */
+    public Map<String, Object> listSeasonRenewalOffers(String seasonKey, String cursor, Integer limit) {
+        return http.get(path(seasonKey, "/renewal-offers"), body("cursor", cursor, "limit", limit));
     }
 
     /**
@@ -386,13 +422,20 @@ public final class Seasons {
     /**
      * Dry-runs or commits renewal rights derived from a previous Season's holders.
      *
-     * <p>Header replay: the same idempotency key is reused on every retry.
+     * <p>A dry run answers {@code 200} and a commit of 100 holders or fewer {@code 201}, both with
+     * the {@code import}. A commit of more than 100 holders answers {@code 202} with the
+     * {@code job}: a {@code holder_import} job brings them across. Follow it with
+     * {@link #retrieveSeasonBulkJob}; its {@code summary} has the same counts when it completes.
+     * Can refuse with {@code 409 job_mismatch} or {@code 503 job_busy} or
+     * {@code season_not_configured}.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry and answers the same job.
      *
      * @param seasonKey the Season key
      * @param params the request body: {@code sourceSeasonId} and {@code successorPlanActivationId},
      *     and optionally {@code dryRun}
      * @param idempotencyKey a stable key, or {@code null} to generate one
-     * @return the decoded response
+     * @return the decoded response: the {@code import}, or the {@code job}
      */
     public Map<String, Object> createSeasonHolderImportFromSeason(
             String seasonKey, Map<String, Object> params, String idempotencyKey) {
@@ -803,13 +846,27 @@ public final class Seasons {
     }
 
     /**
-     * Retrieves hosted renewal links, payments and emails per offer.
+     * Retrieves hosted renewal links, payments and emails for the first page of offers.
      *
      * @param seasonKey the Season key
-     * @return the decoded response
+     * @return the decoded response, with the {@code offers} and {@code nextCursor}
      */
     public Map<String, Object> retrieveSeasonHostedRenewals(String seasonKey) {
-        return http.get(path(seasonKey, "/renewal-hosted"));
+        return retrieveSeasonHostedRenewals(seasonKey, null, null);
+    }
+
+    /**
+     * Retrieves hosted renewal links, payments and emails per offer, one page at a time, newest
+     * first. Null arguments are not sent.
+     *
+     * @param seasonKey the Season key
+     * @param cursor the {@code nextCursor} from the previous page, or {@code null}
+     * @param limit offers a page, 1-500, or {@code null} for 500
+     * @return the decoded response, with the {@code offers} and {@code nextCursor} (null on the
+     *     last page)
+     */
+    public Map<String, Object> retrieveSeasonHostedRenewals(String seasonKey, String cursor, Integer limit) {
+        return http.get(path(seasonKey, "/renewal-hosted"), body("cursor", cursor, "limit", limit));
     }
 
     /**
@@ -857,7 +914,8 @@ public final class Seasons {
      * <p>Single attempt; the server does not send the same notice twice.
      *
      * @param seasonKey the Season key
-     * @param params the optional request body ({@code offerIds}), or {@code null} for every offer
+     * @param params the optional request body ({@code offerIds}, at most 20,000; more is refused
+     *     with {@code 422 too_many_offer_ids}), or {@code null} for every open offer
      * @return the decoded response
      */
     public Map<String, Object> createSeasonRenewalNotices(
@@ -1009,6 +1067,21 @@ public final class Seasons {
     }
 
     /**
+     * Releases the seats of every lapsed renewal offer, as a job. An offer extended before its
+     * turn is skipped and keeps its seat. Follow it with {@link #retrieveSeasonBulkJob}.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry and replays the same job.
+     *
+     * @param seasonKey the Season key
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response, with the {@code job}
+     */
+    public Map<String, Object> releaseSeasonLapsedOffers(String seasonKey, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/renewal-offers/release-lapsed"), null, idempotencyKey);
+    }
+
+    /**
      * Lists the Season's bulk jobs, newest first (100 at most).
      *
      * @param seasonKey the Season key
@@ -1019,7 +1092,8 @@ public final class Seasons {
     }
 
     /**
-     * Retrieves one bulk job with its counts and up to 500 failed items.
+     * Retrieves one bulk job with its counts, its {@code summary} (empty until it completes) and
+     * up to 500 failed items.
      *
      * @param seasonKey the Season key
      * @param jobId the job id

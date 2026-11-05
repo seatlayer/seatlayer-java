@@ -2,10 +2,10 @@
 
 ## Unreleased
 
-- Added 38 Season operations to `seasons()`, for 86 in all: performances, package prices, plan
+- Added 39 Season operations to `seasons()`, for 87 in all: performances, package prices, plan
   edits and deletion, one-call publish, checkout tests, occurrence returns and reclaims, holders,
   Season order refunds and cancellations, hosted renewals, renewal links and notices, renewal
-  quotes, intents and checkouts, sales and seat reports, seat counts, holder and order CSV exports, and bulk refunds with their jobs.
+  quotes, intents and checkouts, sales and seat reports, seat counts, holder and order CSV exports, and bulk refunds and the release of lapsed renewal offers with their jobs.
 - Added `holders()` (customers, holder reads and updates, sign-out, seasons, tickets, and ticket
   transfers), `orders()` (orders across events and seasons, one event's orders, CSV export,
   refunds, cancellations, and ticket emails), and `eventSeries()` (create, list, retrieve, add
@@ -15,7 +15,7 @@
   preflight and transition, booking fee, and discount codes.
 - The three CSV exports return the CSV text as a `String`. `deleteSeasonPlan` and
   `deleteEventDiscountCode` return nothing (the API answers 204).
-- 26 of the new operations use header replay, with one `Idempotency-Key` reused on every retry.
+- 27 of the new operations use header replay, with one `Idempotency-Key` reused on every retry.
   The other 54 are single-attempt and send no key.
 - Added `seasons().refundSeasonPerformance` (refund every order of a cancelled date as a job, with
   header replay), `seasons().listSeasonBulkJobs`, and `seasons().retrieveSeasonBulkJob`.
@@ -40,6 +40,11 @@
 - Season holds, give-backs and date cancels can refuse with `performance_cancelled`, `refund_not_started` (503), `missing_manage_capability` (403) or `invalid_refund`; a holder's status can be `reserved`; hosted renewal readiness carries `missingPrices`.
 - `eventSeries().createEventSeries` takes `fromEventKey` in place of `name` and `chartKey`: an event you already set up becomes the first date under its own key, and every other date is a copy of it. It refuses with `404 event_not_found`, or `422 event_has_no_date`, `event_in_season`, `event_in_performance_group`, `event_in_series` or `invalid_request`.
 - Every date of an event series carries the series' plain name (`Hamlet`, not `Hamlet · 3 Nov`); tell dates apart by `startsAt`. `updateEventSeries` renames each date that carries the series name, and a series name cannot hold `{n}`, `{date}` or `{time}`.
+- Added `seasons().releaseSeasonLapsedOffers`: release the seats of every lapsed renewal offer as a job (`202` with the `job`), with header replay. An offer extended before its turn is skipped and keeps its seat.
+- Added `retrieveSeasonHostedRenewals` and `listSeasonRenewalOffers` overloads that take `cursor` and `limit` (1-500 and 1-100); both answers carry `nextCursor`, null on the last page, and a bad cursor or limit answers `400 invalid_cursor` or `invalid_limit`. The one-argument forms read the first page.
+- `createSeasonRenewalOffers` answers `201` with the `offers` for 100 contracts or fewer, and `202` with a `renewal_run` `job` and its `batchId` above that: follow the job with `retrieveSeasonBulkJob`, then page the offers with `listSeasonRenewalOffers`. It can refuse with `409 job_mismatch` or `503 season_not_configured`.
+- `createSeasonHolderImportFromSeason` answers `202` with a `holder_import` `job` when a commit brings across more than 100 holders; the job's `summary` has the same counts when it completes. It can refuse with `409 job_mismatch`, or `503 job_busy` or `season_not_configured`. A retrieved bulk job carries `summary`, and its `kind` can be `holder_import`.
+- `createSeasonRenewalNotices` takes up to 20,000 `offerIds`; more answers `422 too_many_offer_ids`.
 
 ## 0.8.0 (2026-09-10)
 
