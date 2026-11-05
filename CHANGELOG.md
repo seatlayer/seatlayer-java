@@ -2,10 +2,10 @@
 
 ## Unreleased
 
-- Added 35 Season operations to `seasons()`, for 83 in all: performances, package prices, plan
+- Added 38 Season operations to `seasons()`, for 86 in all: performances, package prices, plan
   edits and deletion, one-call publish, checkout tests, occurrence returns and reclaims, holders,
-  Season order refunds and cancellations, hosted renewals, renewal links and notices, sales and
-  seat reports, seat counts, holder and order CSV exports, and bulk refunds with their jobs.
+  Season order refunds and cancellations, hosted renewals, renewal links and notices, renewal
+  quotes, intents and checkouts, sales and seat reports, seat counts, holder and order CSV exports, and bulk refunds with their jobs.
 - Added `holders()` (customers, holder reads and updates, sign-out, seasons, tickets, and ticket
   transfers), `orders()` (orders across events and seasons, one event's orders, CSV export,
   refunds, cancellations, and ticket emails), and `eventSeries()` (create, list, retrieve, add
@@ -15,8 +15,8 @@
   preflight and transition, booking fee, and discount codes.
 - The three CSV exports return the CSV text as a `String`. `deleteSeasonPlan` and
   `deleteEventDiscountCode` return nothing (the API answers 204).
-- 24 of the new operations use header replay, with one `Idempotency-Key` reused on every retry.
-  The other 51 are single-attempt and send no key.
+- 26 of the new operations use header replay, with one `Idempotency-Key` reused on every retry.
+  The other 54 are single-attempt and send no key.
 - Added `seasons().refundSeasonPerformance` (refund every order of a cancelled date as a job, with
   header replay), `seasons().listSeasonBulkJobs`, and `seasons().retrieveSeasonBulkJob`.
 - Documented the new request fields the `Map` bodies carry: `priceTypeKey` on each
@@ -26,6 +26,12 @@
   `createSeasonAmendment`.
 - `EventListOptions` takes `seriesKey` (builder `seriesKey(...)`) to list one event series' dates;
   the five-argument constructor stays.
+- Added `seasons().retrieveSeasonRenewalQuote`: what renewing an offer costs, and whether SeatLayer checkout can take it now.
+- Added `seasons().createSeasonRenewalIntent`: record a holder's intent for a renewal taken by phone or at the box office, so your own checkout can commit.
+- Added `seasons().createSeasonRenewalCheckout`: a SeatLayer checkout that renews an offer with no hosted page, with header replay.
+- Added `holders().createHolderRenewalCheckout`: the same checkout for one of a holder's offers, with header replay.
+- Added `holders().declineHolderRenewalOffer`: decline one of a holder's offers, with an optional `reason`.
+- Added a `declineSeasonRenewalOffer` overload that takes a `reason`, kept on the offer as `declineReason`.
 
 ## 0.8.0 (2026-09-10)
 

@@ -79,7 +79,7 @@ final class SeasonPlatformTest {
     }
 
     @Test
-    void mapsAll12HolderOperations() {
+    void mapsAll14HolderOperations() {
         SeatLayer sdk = client("{}");
         Holders holders = sdk.holders();
         String ref = "holder a/b";
@@ -101,6 +101,11 @@ final class SeasonPlatformTest {
         holders.acceptHolderTransfer(ref, "tr/1");
         holders.createHolderReturn(
                 ref, Map.of("ticketIds", List.of("tkt_0123456789abcdef01234567")), "return-1");
+        holders.createHolderRenewalCheckout(ref, "offer/1", Map.of(
+                "returnUrl", "https://tickets.example/renewed", "buyerEmail", "cara@example.com",
+                "buyerName", "Cara", "provider", "stripe"), "renew-1");
+        holders.declineHolderRenewalOffer(ref, "offer/1", Map.of("reason", "Moving away"));
+        holders.declineHolderRenewalOffer(ref, "offer/1");
 
         String holder = "/v1/holders/holder%20a%2Fb";
         assertCalls(List.of(
@@ -129,9 +134,19 @@ final class SeasonPlatformTest {
                 new Expected("POST " + holder + "/transfers/tr%2F1/accept", null, false),
                 new Expected(
                         "POST " + holder + "/returns",
-                        "{\"ticketIds\":[\"tkt_0123456789abcdef01234567\"]}", true)));
+                        "{\"ticketIds\":[\"tkt_0123456789abcdef01234567\"]}", true),
+                new Expected(
+                        "POST " + holder + "/renewal-offers/offer%2F1/checkout",
+                        "{\"returnUrl\":\"https://tickets.example/renewed\",\"buyerEmail\":\"cara@example.com\","
+                                + "\"buyerName\":\"Cara\",\"provider\":\"stripe\"}",
+                        true),
+                new Expected(
+                        "POST " + holder + "/renewal-offers/offer%2F1/decline",
+                        "{\"reason\":\"Moving away\"}", false),
+                new Expected("POST " + holder + "/renewal-offers/offer%2F1/decline", null, false)));
         assertEquals("holder-update-1", calls.get(3).headers().get("Idempotency-Key"));
         assertEquals("return-1", calls.get(14).headers().get("Idempotency-Key"));
+        assertEquals("renew-1", calls.get(15).headers().get("Idempotency-Key"));
     }
 
     @Test
@@ -359,6 +374,46 @@ final class SeasonPlatformTest {
     }
 
     @Test
+    void renewalCheckoutsRetryWithOneKeyGeneratedOrGiven() {
+        String started = "{\"orderId\":\"ord_1\",\"payment\":{\"url\":\"https://pay.example/1\"}}";
+        SeatLayer sdk = client(List.of(
+                rateLimited(),
+                new SeatLayerHttpClient.Response(201, started, Map.of()),
+                rateLimited(),
+                new SeatLayerHttpClient.Response(201, started, Map.of())));
+        Map<String, Object> body = Map.of("returnUrl", "https://tickets.example/r");
+
+        Map<String, Object> result = sdk.holders().createHolderRenewalCheckout("a/b", "offer_1", body, null);
+        sdk.seasons().createSeasonRenewalCheckout("sea_1", "offer_1", body, "renew-1");
+
+        assertEquals(Json.read(started), result);
+        String bodyJson = "{\"returnUrl\":\"https://tickets.example/r\"}";
+        assertCalls(List.of(
+                new Expected("POST /v1/holders/a%2Fb/renewal-offers/offer_1/checkout", bodyJson, true),
+                new Expected("POST /v1/holders/a%2Fb/renewal-offers/offer_1/checkout", bodyJson, true),
+                new Expected("POST /v1/seasons/sea_1/renewal-offers/offer_1/checkout", bodyJson, true),
+                new Expected("POST /v1/seasons/sea_1/renewal-offers/offer_1/checkout", bodyJson, true)));
+        assertEquals(
+                calls.get(0).headers().get("Idempotency-Key"), calls.get(1).headers().get("Idempotency-Key"));
+        assertEquals("renew-1", calls.get(2).headers().get("Idempotency-Key"));
+        assertEquals("renew-1", calls.get(3).headers().get("Idempotency-Key"));
+    }
+
+    @Test
+    void seasonDeclineSendsTheReasonOrAnEmptyObject() {
+        SeatLayer sdk = client("{}");
+
+        sdk.seasons().declineSeasonRenewalOffer("sea/a", "offer/1", Map.of("reason", "Moving away"));
+        sdk.seasons().declineSeasonRenewalOffer("sea_1", "offer_1");
+
+        assertCalls(List.of(
+                new Expected(
+                        "POST /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/decline",
+                        "{\"reason\":\"Moving away\"}", false),
+                new Expected("POST /v1/seasons/sea_1/renewal-offers/offer_1/decline", "{}", false)));
+    }
+
+    @Test
     void unsupportedAndDomainExactOperationsAreSingleAttempt() {
         SeatLayer resend = client(List.of(rateLimited()));
         assertThrows(
@@ -389,6 +444,23 @@ final class SeasonPlatformTest {
         assertThrows(
                 SeatLayerRateLimitException.class,
                 () -> transfer.holders().acceptHolderTransfer("holder_1", "tr_1"));
+        assertEquals(1, calls.size());
+        assertNull(calls.get(0).headers().get("Idempotency-Key"));
+
+        calls.clear();
+        SeatLayer intent = client(List.of(rateLimited()));
+        assertThrows(
+                SeatLayerRateLimitException.class,
+                () -> intent.seasons().createSeasonRenewalIntent("sea_1", "offer_1"));
+        assertEquals(1, calls.size());
+        assertNull(calls.get(0).headers().get("Idempotency-Key"));
+
+        calls.clear();
+        SeatLayer decline = client(List.of(rateLimited()));
+        assertThrows(
+                SeatLayerRateLimitException.class,
+                () -> decline.holders().declineHolderRenewalOffer(
+                        "holder_1", "offer_1", Map.of("reason", "Moving away")));
         assertEquals(1, calls.size());
         assertNull(calls.get(0).headers().get("Idempotency-Key"));
     }

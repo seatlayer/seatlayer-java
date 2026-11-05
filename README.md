@@ -93,10 +93,11 @@ The hint is best effort, not a data-residency guarantee. See the
 
 ## Fixed Renewable Seasons
 
-`seatlayer.seasons()` exposes 83 trusted organizer operations: the 48 from
+`seatlayer.seasons()` exposes 86 trusted organizer operations: the 48 from
 version `0.7.0`, plus performances, package prices (each price may name a
 `priceTypeKey`: `adult`, `child`, `concession`, `senior` or `student`), checkout
-tests, holders, Season orders, hosted renewals, reports, CSV exports, and the
+tests, holders, Season orders, hosted renewals, renewal quotes, intents and
+checkouts, reports, CSV exports, and the
 bulk refund of a cancelled date (`refundSeasonPerformance`) with its jobs
 (`listSeasonBulkJobs`, `retrieveSeasonBulkJob`).
 
@@ -119,6 +120,25 @@ Treat `202` as accepted work and poll `retrieveSeasonLifecycle()` with the
 returned operation identity. Buyer-session minting and domain-exact booking,
 cancellation, and renewal actions remain single-attempt; only declared
 header-replay catalogue mutations retry automatically.
+
+When SeatLayer takes the Season's payments, renew a holder with no hosted page:
+read the price, start a checkout, and send the holder to `payment.url`. For a
+renewal taken by phone or at the box office, `createSeasonRenewalIntent` records
+the holder's intent before you commit the offer. A decline can carry the
+holder's reason.
+
+```java
+Map<String, Object> quote = seatlayer.seasons().retrieveSeasonRenewalQuote(seasonKey, offerId);
+if (quote.get("problem") == null) {
+    Map<String, Object> started = seatlayer.seasons().createSeasonRenewalCheckout(
+        seasonKey, offerId,
+        Map.of("returnUrl", "https://tickets.yourclub.example/renewed"),
+        "renew-" + offerId);
+    // Send the holder to the "url" under started.get("payment").
+}
+seatlayer.holders().declineHolderRenewalOffer(
+    "holder_123", offerId, Map.of("reason", "Moving away"));
+```
 
 ## Orders, holders, event sales, and event series
 
@@ -352,20 +372,22 @@ support requests. All are unchecked, so they do not force `throws` clauses throu
 ## Reliability
 
 **Retries and idempotency.** Reads (`GET`/`HEAD`) retry connection failures, 408, 429 and 5xx with
-exponential backoff and full jitter; `Retry-After` wins when the server sends it. Thirty-eight
+exponential backoff and full jitter; `Retry-After` wins when the server sends it. Forty
 mutations use exact header replay:
 
 - `charts().create`, `charts().copy`, `templates().instantiateTemplate`, `events().create`,
   `workspaces().create`, and `performanceGroups().create`
-- 24 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
+- 25 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
   `updateSeasonPlan`, `deleteSeasonPlan`, `publishSeason`, `duplicateSeasonToLive`,
   `createSeasonHolderImport`, `createSeasonHolderImportFromSeason`, `createSeasonRenewalOffers`,
   `createSeasonAmendment`, `createSeasonPerformances`, `attachSeasonPerformances`,
   `deleteSeasonPerformance`, `markSeasonPerformancePast`, `createSeasonCheckoutTest`,
   `replaceSeasonPackagePrices`, `attachSeasonPlanPerformance`, `deleteSeasonPlanPerformance`,
-  `refundSeasonOrder`, `cancelSeasonOrder`, `cancelSeasonOrderDate`, and `refundSeasonPerformance`
+  `refundSeasonOrder`, `cancelSeasonOrder`, `cancelSeasonOrderDate`, `refundSeasonPerformance`, and
+  `createSeasonRenewalCheckout`
 - `holders().updateHolder`, `holders().createHolderTransfer`, `holders().createHolderReturn`,
-  `orders().refundEventOrder`, and `orders().cancelEventOrder`
+  `holders().createHolderRenewalCheckout`, `orders().refundEventOrder`, and
+  `orders().cancelEventOrder`
 - `eventSeries().createEventSeries`, `eventSeries().addEventSeriesDates`, and
   `eventSeries().updateEventSeries`
 
@@ -409,14 +431,14 @@ outbox, and support operations.
 | `events()` | `list` `listAll` `create` `retrieve` `retrieveConfigurationBinding` `updateConfigurationBinding` `update` `delete` `updateChart` `close` `reopen` `archive` `retrieveHoldTtl` `updateHoldTtl` `listTicketReleases` `updateTicketReleases` `closeTicketRelease` `retrieveReport` `retrieveLog` `retrieveEventBuyerCheckout` `replaceEventBuyerCheckout` `retrieveEventPaymentGateway` `replaceEventPaymentGateway` `retrieveEventSalesReadiness` `preflightEventSales` `transitionEventSales` `retrieveEventBookingFee` `replaceEventBookingFee` `listEventDiscountCodes` `createEventDiscountCode` `updateEventDiscountCode` `endEventDiscountCode` `deleteEventDiscountCode` |
 | `eventSeries()` | `createEventSeries` `listEventSeries` `retrieveEventSeries` `addEventSeriesDates` `updateEventSeries` |
 | `orders()` | `listOrders` `retrieveOrder` `listOrderTickets` `listEventOrders` `retrieveEventOrder` `exportEventOrdersCsv` `refundEventOrder` `cancelEventOrder` `resendEventOrderTickets` |
-| `holders()` | `listCustomers` `retrieveHolder` `updateHolder` `revokeHolderSessions` `listHolderSeasons` `listHolderTickets` `retrieveHolderTicket` `createHolderTransfer` `listHolderTransfers` `cancelHolderTransfer` `acceptHolderTransfer` `createHolderReturn` |
+| `holders()` | `listCustomers` `retrieveHolder` `updateHolder` `revokeHolderSessions` `listHolderSeasons` `listHolderTickets` `retrieveHolderTicket` `createHolderTransfer` `listHolderTransfers` `cancelHolderTransfer` `acceptHolderTransfer` `createHolderReturn` `createHolderRenewalCheckout` `declineHolderRenewalOffer` |
 | `channels()` | `list` `create` `update` `updateAssignments` `listAllocation` `retrieveAccessPreview` `retrieveReport` `pause` `unpause` `archive` `createBuyerAccessSession` `listBuyerAccessSessions` `revokeBuyerAccessSession` |
 | `inventory()` | `hold` `holdBestAvailable` `bookBestAvailable` `extendHold` `retrieveHold` `release` `book` `bookLabels` `boxOfficeBook` `unbook` `block` `unblock` `unblockAll` `retrieveAvailability` `updateAvailability` `listBookings` `retrieveBooking` |
 | `sessions()` | `createManageSession` `revokeManageSession` `createDesignerSession` `revokeDesignerSession` |
 | `webhooks()` | `list` `create` `update` `delete` `listDeliveries` |
 | `workspaces()` | `list` `create` `retrieve` `update` |
 | `performanceGroups()` | `list` `create` `retrieve` `delete` `activate` `close` `retrieveLifecycle` `createBuyerAccessSession` `listBuyerAccessSessions` `revokeBuyerAccessSession` `retrieveHold` `bookHold` `retrieveBooking` |
-| `seasons()` | 83 operations for catalogue and Plan lifecycle, performances, package prices, sales windows, checkout tests, buyer access and booking, holders and holder imports, Season orders, renewals and hosted renewals, occurrence returns and amendments, bulk refunds and jobs, reports and CSV exports, audit, outbox, and support export |
+| `seasons()` | 86 operations for catalogue and Plan lifecycle, performances, package prices, sales windows, checkout tests, buyer access and booking, holders and holder imports, Season orders, renewals, hosted renewals and renewal checkouts, occurrence returns and amendments, bulk refunds and jobs, reports and CSV exports, audit, outbox, and support export |
 
 Full reference: [SeatLayer Java server SDK guide](https://docs.seatlayer.io/server-sdk/java/)
 

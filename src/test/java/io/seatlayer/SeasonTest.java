@@ -17,7 +17,7 @@ final class SeasonTest {
     }
 
     @Test
-    void mapsAll83SeasonOperationsAndReplayClasses() {
+    void mapsAll86SeasonOperationsAndReplayClasses() {
         List<Call> calls = new ArrayList<>();
         SeatLayer sdk = SeatLayer.builder()
                 .secretKey("sk_test_abc")
@@ -123,8 +123,13 @@ final class SeasonTest {
                 key, "ev/1", Map.of("amount", "per_date", "reason", "Storm"), "refund-date-1");
         seasons.listSeasonBulkJobs(key);
         seasons.retrieveSeasonBulkJob(key, "job/1");
+        seasons.retrieveSeasonRenewalQuote(key, "offer/1");
+        seasons.createSeasonRenewalIntent(key, "offer/1");
+        seasons.createSeasonRenewalCheckout(key, "offer/1", Map.of(
+                "returnUrl", "https://tickets.example/renewed", "buyerEmail", "ana@example.com",
+                "buyerName", "Ana Silva", "provider", "stripe"), "renew-1");
 
-        assertEquals(83, calls.size());
+        assertEquals(86, calls.size());
         assertEquals("{}", holdersCsv);
         assertEquals("{}", ordersCsv);
         assertNull(calls.get(26).body());
@@ -197,7 +202,10 @@ final class SeasonTest {
                 "GET /v1/seasons/sea%2Fa/seat-counts",
                 "POST /v1/seasons/sea%2Fa/performances/ev%2F1/refunds",
                 "GET /v1/seasons/sea%2Fa/jobs",
-                "GET /v1/seasons/sea%2Fa/jobs/job%2F1");
+                "GET /v1/seasons/sea%2Fa/jobs/job%2F1",
+                "GET /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/quote",
+                "POST /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/intent",
+                "POST /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/checkout");
         List<String> actual = calls.stream()
                 .map(call -> call.method() + " " + call.url().substring("https://api.seatlayer.io".length()))
                 .toList();
@@ -205,7 +213,7 @@ final class SeasonTest {
 
         List<Integer> replayIndexes = List.of(
                 2, 4, 5, 10, 18, 27, 29, 38,
-                48, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 66, 67, 68, 80);
+                48, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 66, 67, 68, 80, 85);
         for (int index = 0; index < calls.size(); index++) {
             if (replayIndexes.contains(index)) {
                 assertTrue(calls.get(index).headers().containsKey("Idempotency-Key"));
@@ -217,8 +225,9 @@ final class SeasonTest {
         assertEquals("plan-del-1", calls.get(54).headers().get("Idempotency-Key"));
         assertEquals("cancel-date-1", calls.get(68).headers().get("Idempotency-Key"));
         assertEquals("refund-date-1", calls.get(80).headers().get("Idempotency-Key"));
+        assertEquals("renew-1", calls.get(85).headers().get("Idempotency-Key"));
 
-        // JSON bodies of the 35 operations added after the first 48, in call order; null means no body.
+        // JSON bodies of the 38 operations added after the first 48, in call order; null means no body.
         List<String> addedBodies = Arrays.asList(
                 "{\"sourceSeasonId\":\"sea_2026\",\"successorPlanActivationId\":\"pa_1\"}",
                 null,
@@ -256,8 +265,12 @@ final class SeasonTest {
                 null,
                 "{\"amount\":\"per_date\",\"reason\":\"Storm\"}",
                 null,
-                null);
-        assertEquals(35, addedBodies.size());
+                null,
+                null,
+                null,
+                "{\"returnUrl\":\"https://tickets.example/renewed\",\"buyerEmail\":\"ana@example.com\","
+                        + "\"buyerName\":\"Ana Silva\",\"provider\":\"stripe\"}");
+        assertEquals(38, addedBodies.size());
         for (int offset = 0; offset < addedBodies.size(); offset++) {
             Call call = calls.get(48 + offset);
             String label = "call " + (48 + offset) + " " + expected.get(48 + offset);

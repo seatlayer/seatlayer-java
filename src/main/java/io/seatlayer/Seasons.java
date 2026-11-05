@@ -272,9 +272,35 @@ public final class Seasons {
                         "planActivationId", planActivationId));
     }
 
+    /**
+     * Declines a renewal offer and releases its seats at once, with no reason.
+     *
+     * <p>Single attempt; a repeated decline answers the same offer.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @return the decoded response
+     */
     public Map<String, Object> declineSeasonRenewalOffer(String seasonKey, String offerId) {
+        return declineSeasonRenewalOffer(seasonKey, offerId, null);
+    }
+
+    /**
+     * Declines a renewal offer and releases its seats at once.
+     *
+     * <p>Single attempt; a repeated decline answers the same offer and keeps the first reason.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @param params the optional request body ({@code reason}, 1 to 200 characters, kept on the
+     *     offer as {@code declineReason}), or {@code null} for none
+     * @return the decoded response
+     */
+    public Map<String, Object> declineSeasonRenewalOffer(
+            String seasonKey, String offerId, Map<String, Object> params) {
         return http.post(
-                path(seasonKey, "/renewal-offers/" + encode(offerId) + "/decline"), Map.of());
+                path(seasonKey, "/renewal-offers/" + encode(offerId) + "/decline"),
+                params == null ? Map.of() : params);
     }
 
     public Map<String, Object> releaseSeasonRenewalOffer(String seasonKey, String offerId) {
@@ -838,6 +864,54 @@ public final class Seasons {
      */
     public Map<String, Object> resendSeasonRenewalOffer(String seasonKey, String offerId) {
         return http.post(path(seasonKey, "/renewal-offers/" + encode(offerId) + "/resend"));
+    }
+
+    /**
+     * Retrieves what renewing an offer costs, priced as the SeatLayer checkout will charge it.
+     *
+     * <p>{@code problem} is null when SeatLayer checkout can take the renewal now; otherwise it
+     * says why not.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveSeasonRenewalQuote(String seasonKey, String offerId) {
+        return http.get(path(seasonKey, "/renewal-offers/" + encode(offerId) + "/quote"));
+    }
+
+    /**
+     * Records that the holder means to renew, for a renewal taken by phone or at the box office,
+     * so your own checkout can commit the offer.
+     *
+     * <p>Single attempt; a repeat answers the same offer.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @return the decoded response
+     */
+    public Map<String, Object> createSeasonRenewalIntent(String seasonKey, String offerId) {
+        return http.post(path(seasonKey, "/renewal-offers/" + encode(offerId) + "/intent"));
+    }
+
+    /**
+     * Starts a SeatLayer checkout that renews an offer, with no hosted page. Send the buyer to
+     * {@code payment.url}; paying renews the offer.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry and answers the same
+     * order.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @param params the request body: {@code returnUrl} (on one of the organization's allowed
+     *     domains), plus optional {@code buyerEmail}, {@code buyerName} and {@code provider}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> createSeasonRenewalCheckout(
+            String seasonKey, String offerId, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/renewal-offers/" + encode(offerId) + "/checkout"), params, idempotencyKey);
     }
 
     /**

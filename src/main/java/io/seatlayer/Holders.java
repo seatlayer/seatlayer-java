@@ -7,7 +7,7 @@ import java.util.Map;
 
 /**
  * Season ticket holders: their customer record, sign-in sessions, seasons, tickets, ticket
- * transfers and returns, plus the customer list.
+ * transfers, returns and renewals, plus the customer list.
  *
  * <p>A holder is addressed by the holder reference its imports and bookings carry.
  */
@@ -216,5 +216,54 @@ public final class Holders {
     public Map<String, Object> createHolderReturn(
             String holderRef, Map<String, Object> params, String idempotencyKey) {
         return http.postWithHeaderReplay(path(holderRef, "/returns"), params, idempotencyKey);
+    }
+
+    /**
+     * Starts a SeatLayer checkout that renews one of a holder's offers ({@code renewalOffer} on
+     * {@link #listHolderSeasons(String)}). Send the buyer to {@code payment.url}.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry and answers the same
+     * order.
+     *
+     * @param holderRef the holder reference
+     * @param offerId the renewal offer id
+     * @param params the request body: {@code returnUrl} (on one of the organization's allowed
+     *     domains), plus optional {@code buyerEmail}, {@code buyerName} and {@code provider}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> createHolderRenewalCheckout(
+            String holderRef, String offerId, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(holderRef, "/renewal-offers/" + encode(offerId) + "/checkout"), params, idempotencyKey);
+    }
+
+    /**
+     * Declines one of a holder's renewal offers and releases its seats, with no reason.
+     *
+     * <p>Single attempt; declining again answers the same offer.
+     *
+     * @param holderRef the holder reference
+     * @param offerId the renewal offer id
+     * @return the decoded response
+     */
+    public Map<String, Object> declineHolderRenewalOffer(String holderRef, String offerId) {
+        return declineHolderRenewalOffer(holderRef, offerId, null);
+    }
+
+    /**
+     * Declines one of a holder's renewal offers and releases its seats.
+     *
+     * <p>Single attempt; declining again answers the same offer, with the first reason.
+     *
+     * @param holderRef the holder reference
+     * @param offerId the renewal offer id
+     * @param params the optional request body ({@code reason}, 1 to 200 characters, kept on the
+     *     offer as {@code declineReason}), or {@code null} to send no body
+     * @return the decoded response
+     */
+    public Map<String, Object> declineHolderRenewalOffer(
+            String holderRef, String offerId, Map<String, Object> params) {
+        return http.post(path(holderRef, "/renewal-offers/" + encode(offerId) + "/decline"), params);
     }
 }
