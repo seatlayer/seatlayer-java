@@ -131,7 +131,7 @@ final class SeasonPlatformTest {
                         "POST " + holder + "/returns",
                         "{\"ticketIds\":[\"tkt_0123456789abcdef01234567\"]}", true)));
         assertEquals("holder-update-1", calls.get(3).headers().get("Idempotency-Key"));
-        assertEquals("return-1", calls.get(15).headers().get("Idempotency-Key"));
+        assertEquals("return-1", calls.get(14).headers().get("Idempotency-Key"));
     }
 
     @Test
