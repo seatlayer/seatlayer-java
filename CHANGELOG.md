@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- Added 32 Season operations to `seasons()`, for 80 in all: performances, package prices, plan
+  edits and deletion, one-call publish, checkout tests, occurrence returns and reclaims, holders,
+  Season order refunds and cancellations, hosted renewals, renewal links and notices, sales and
+  seat reports, seat counts, and holder and order CSV exports.
+- Added `holders()` (customers, holder reads and updates, sign-out, seasons, tickets, and ticket
+  transfers), `orders()` (orders across events and seasons, one event's orders, CSV export,
+  refunds, cancellations, and ticket emails), and `eventSeries()` (create, list, retrieve, add
+  dates, and update).
+- Added event sales operations to `events()`: buyer checkout, payment gateway, sales readiness,
+  preflight and transition, booking fee, and discount codes.
+- The three CSV exports return the CSV text as a `String`. `deleteSeasonPlan` and
+  `deleteEventDiscountCode` return nothing (the API answers 204).
+- 22 of the new operations use header replay, with one `Idempotency-Key` reused on every retry.
+  The other 49 are single-attempt and send no key.
+
 ## 0.8.0 (2026-09-10)
 
 - Added Event hosting regions: the `EventHostingRegion` enum, a `region` overload on event create, `defaultRegion` on workspace create, and `updateDefaultRegion`. Events created without a region run in Western Europe.
