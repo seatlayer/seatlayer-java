@@ -106,6 +106,24 @@ final class SeatLayerHttpClient {
             Object body,
             boolean headerReplay,
             String idempotencyKey) {
+        Response response =
+                exchange(method, path, query, body, headerReplay, idempotencyKey, "application/json");
+        if (response.status() == 204 || response.body() == null || response.body().isBlank()) {
+            return Map.of();
+        }
+        Object decoded = Json.read(response.body());
+        return decoded instanceof Map<?, ?> ? Json.readObject(response.body()) : Map.of("data", decoded);
+    }
+
+    /** Sends with auth, idempotency and retry, and returns the 2xx response undecoded. */
+    private Response exchange(
+            String method,
+            String path,
+            Map<String, Object> query,
+            Object body,
+            boolean headerReplay,
+            String idempotencyKey,
+            String accept) {
 
         StringBuilder url = new StringBuilder(baseUrl).append(path);
         if (query != null && !query.isEmpty()) {
@@ -124,7 +142,7 @@ final class SeatLayerHttpClient {
 
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("Authorization", "Bearer " + secretKey);
-        headers.put("Accept", "application/json");
+        headers.put("Accept", accept);
         headers.put("User-Agent", "seatlayer-java");
 
         String payload = null;
@@ -159,11 +177,7 @@ final class SeatLayerHttpClient {
             }
 
             if (response.status() >= 200 && response.status() < 300) {
-                if (response.status() == 204 || response.body() == null || response.body().isBlank()) {
-                    return Map.of();
-                }
-                Object decoded = Json.read(response.body());
-                return decoded instanceof Map<?, ?> ? Json.readObject(response.body()) : Map.of("data", decoded);
+                return response;
             }
 
             Map<String, Object> errorBody;
@@ -195,6 +209,12 @@ final class SeatLayerHttpClient {
 
     Map<String, Object> get(String path, Map<String, Object> query) {
         return performRequest("GET", path, query, null, false, null);
+    }
+
+    /** A read whose body is text, such as a CSV export, returned as sent rather than decoded. */
+    String getText(String path, Map<String, Object> query) {
+        String text = exchange("GET", path, query, null, false, null, "text/csv, application/json").body();
+        return text == null ? "" : text;
     }
 
     Map<String, Object> post(String path) {
