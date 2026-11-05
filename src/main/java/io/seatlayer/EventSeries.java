@@ -28,8 +28,14 @@ public final class EventSeries {
      * <p>Header replay: the same idempotency key is reused on every retry. The API answers
      * 202 when the dates are made as a job.
      *
-     * @param params the request body: {@code name}, {@code chartKey} and {@code schedule},
-     *     plus any optional fields such as {@code dryRun}
+     * <p>Every date carries the series name as its name. Give {@code name} and {@code chartKey},
+     * or {@code fromEventKey}: an event you already set up becomes the first date under its own
+     * key, and every other date is a copy of it (floor plan, prices, checkout, poster and its own
+     * seat blocks, none of its orders, holds or sales). The series takes the event's name, zone
+     * and floor plan.
+     *
+     * @param params the request body: {@code name}, {@code chartKey} and {@code schedule}, or
+     *     {@code fromEventKey} and {@code schedule}, plus any optional fields such as {@code dryRun}
      * @param idempotencyKey a stable key, or {@code null} to generate one
      * @return the decoded response
      */
