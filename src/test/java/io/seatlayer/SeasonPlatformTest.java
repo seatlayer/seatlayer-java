@@ -79,7 +79,7 @@ final class SeasonPlatformTest {
     }
 
     @Test
-    void mapsAll11HolderOperations() {
+    void mapsAll12HolderOperations() {
         SeatLayer sdk = client("{}");
         Holders holders = sdk.holders();
         String ref = "holder a/b";
@@ -99,6 +99,8 @@ final class SeasonPlatformTest {
         holders.listHolderTransfers(ref);
         holders.cancelHolderTransfer(ref, "tr/1");
         holders.acceptHolderTransfer(ref, "tr/1");
+        holders.createHolderReturn(
+                ref, Map.of("ticketIds", List.of("tkt_0123456789abcdef01234567")), "return-1");
 
         String holder = "/v1/holders/holder%20a%2Fb";
         assertCalls(List.of(
@@ -124,8 +126,12 @@ final class SeasonPlatformTest {
                         "{\"ticketIds\":[\"tkt_1\"],\"toEmail\":\"friend@example.com\"}", true),
                 new Expected("GET " + holder + "/transfers", null, false),
                 new Expected("POST " + holder + "/transfers/tr%2F1/cancel", null, false),
-                new Expected("POST " + holder + "/transfers/tr%2F1/accept", null, false)));
+                new Expected("POST " + holder + "/transfers/tr%2F1/accept", null, false),
+                new Expected(
+                        "POST " + holder + "/returns",
+                        "{\"ticketIds\":[\"tkt_0123456789abcdef01234567\"]}", true)));
         assertEquals("holder-update-1", calls.get(3).headers().get("Idempotency-Key"));
+        assertEquals("return-1", calls.get(15).headers().get("Idempotency-Key"));
     }
 
     @Test
@@ -307,6 +313,29 @@ final class SeasonPlatformTest {
         sdk.orders().refundEventOrder("ev_1", "ord_1", null);
 
         assertEquals(2, calls.size());
+        assertEquals(
+                calls.get(0).headers().get("Idempotency-Key"), calls.get(1).headers().get("Idempotency-Key"));
+    }
+
+    @Test
+    void holderReturnRetriesWithOneKey() {
+        String created = "{\"return\":{\"returnId\":\"ret_1\",\"state\":\"returned\","
+                + "\"seasonKey\":\"sea_1\",\"tickets\":[],\"createdAt\":1}}";
+        SeatLayer sdk = client(List.of(
+                rateLimited(),
+                new SeatLayerHttpClient.Response(201, created, Map.of())));
+
+        Map<String, Object> result = sdk.holders().createHolderReturn(
+                "a/b", Map.of("ticketIds", List.of("tkt_0123456789abcdef01234567")), null);
+
+        assertEquals(Json.read(created), result);
+        assertCalls(List.of(
+                new Expected(
+                        "POST /v1/holders/a%2Fb/returns",
+                        "{\"ticketIds\":[\"tkt_0123456789abcdef01234567\"]}", true),
+                new Expected(
+                        "POST /v1/holders/a%2Fb/returns",
+                        "{\"ticketIds\":[\"tkt_0123456789abcdef01234567\"]}", true)));
         assertEquals(
                 calls.get(0).headers().get("Idempotency-Key"), calls.get(1).headers().get("Idempotency-Key"));
     }

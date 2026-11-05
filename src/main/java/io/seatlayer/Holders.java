@@ -6,8 +6,8 @@ import static io.seatlayer.SeatLayerHttpClient.encode;
 import java.util.Map;
 
 /**
- * Season ticket holders: their customer record, sign-in sessions, seasons, tickets and
- * ticket transfers, plus the customer list.
+ * Season ticket holders: their customer record, sign-in sessions, seasons, tickets, ticket
+ * transfers and returns, plus the customer list.
  *
  * <p>A holder is addressed by the holder reference its imports and bookings carry.
  */
@@ -200,5 +200,21 @@ public final class Holders {
      */
     public Map<String, Object> acceptHolderTransfer(String holderRef, String transferId) {
         return http.post(path(holderRef, "/transfers/" + encode(transferId) + "/accept"));
+    }
+
+    /**
+     * Gives back a holder's seat on one date, one per ticket.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry. A repeat answers with
+     * the same return.
+     *
+     * @param holderRef the holder reference
+     * @param params the request body: {@code ticketIds}, 1 to 20 tickets of one season
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response, with the return under {@code return}
+     */
+    public Map<String, Object> createHolderReturn(
+            String holderRef, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(path(holderRef, "/returns"), params, idempotencyKey);
     }
 }
