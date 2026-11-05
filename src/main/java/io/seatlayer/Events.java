@@ -193,4 +193,204 @@ public final class Events {
                 "/v1/events/" + encode(eventKey) + "/log",
                 body("limit", limit, "before", before));
     }
+
+    /**
+     * Retrieves who takes payment for the event, and what blocks a change.
+     *
+     * @param eventKey the event key
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveEventBuyerCheckout(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey) + "/buyer-checkout");
+    }
+
+    /**
+     * Chooses SeatLayer checkout or your own checkout for the event.
+     *
+     * <p>Single attempt; the {@code expectedRevision} compare-and-set makes a repeat safe to
+     * reconcile.
+     *
+     * @param eventKey the event key
+     * @param params the request body: {@code buyerCheckout} and {@code expectedRevision}
+     * @return the decoded response
+     */
+    public Map<String, Object> replaceEventBuyerCheckout(String eventKey, Map<String, Object> params) {
+        return http.put("/v1/events/" + encode(eventKey) + "/buyer-checkout", params);
+    }
+
+    /**
+     * Retrieves the event's payment gateway and the gateways it could use.
+     *
+     * @param eventKey the event key
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveEventPaymentGateway(String eventKey) {
+        return retrieveEventPaymentGateway(eventKey, null);
+    }
+
+    /**
+     * Retrieves the event's payment gateway and the gateways it could use.
+     *
+     * @param eventKey the event key
+     * @param currency check the options against this currency instead of the event's, or
+     *     {@code null}
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveEventPaymentGateway(String eventKey, String currency) {
+        return http.get(
+                "/v1/events/" + encode(eventKey) + "/payment-gateway", body("currency", currency));
+    }
+
+    /**
+     * Replaces the event's payment gateway, sending no request body.
+     *
+     * <p>Single attempt, never retried automatically.
+     *
+     * @param eventKey the event key
+     * @return the decoded response
+     */
+    public Map<String, Object> replaceEventPaymentGateway(String eventKey) {
+        return replaceEventPaymentGateway(eventKey, null);
+    }
+
+    /**
+     * Assigns one of the organization's connected payment gateways to the event.
+     *
+     * <p>Single attempt, never retried automatically.
+     *
+     * @param eventKey the event key
+     * @param params the optional request body ({@code connectionId}, {@code provider}), or
+     *     {@code null}
+     * @return the decoded response
+     */
+    public Map<String, Object> replaceEventPaymentGateway(String eventKey, Map<String, Object> params) {
+        return http.put("/v1/events/" + encode(eventKey) + "/payment-gateway", params);
+    }
+
+    /**
+     * Retrieves what the event still needs before its next sales step.
+     *
+     * @param eventKey the event key
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveEventSalesReadiness(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey) + "/sales/readiness");
+    }
+
+    /**
+     * Records a test order as the event's sales preflight.
+     *
+     * <p>Single attempt, never retried automatically.
+     *
+     * @param eventKey the event key
+     * @param params the request body: {@code orderId}
+     * @return the decoded response
+     */
+    public Map<String, Object> preflightEventSales(String eventKey, Map<String, Object> params) {
+        return http.post("/v1/events/" + encode(eventKey) + "/sales/preflight", params);
+    }
+
+    /**
+     * Moves the event's sales to testable, live, paused or ended.
+     *
+     * <p>Single attempt; the {@code expectedRevision} compare-and-set makes a repeat safe to
+     * reconcile.
+     *
+     * @param eventKey the event key
+     * @param params the request body: {@code to} and {@code expectedRevision}, and optionally
+     *     {@code reason}
+     * @return the decoded response
+     */
+    public Map<String, Object> transitionEventSales(String eventKey, Map<String, Object> params) {
+        return http.post("/v1/events/" + encode(eventKey) + "/sales/transition", params);
+    }
+
+    /**
+     * Retrieves the event's booking fee.
+     *
+     * @param eventKey the event key
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveEventBookingFee(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey) + "/booking-fee");
+    }
+
+    /**
+     * Sets or clears the event's booking fee.
+     *
+     * <p>Single attempt, never retried automatically. To clear the fee, send
+     * {@code bookingFeeMinor} as {@code null} in a map that allows null values.
+     *
+     * @param eventKey the event key
+     * @param params the request body: {@code bookingFeeMinor}
+     * @return the decoded response
+     */
+    public Map<String, Object> replaceEventBookingFee(String eventKey, Map<String, Object> params) {
+        return http.put("/v1/events/" + encode(eventKey) + "/booking-fee", params);
+    }
+
+    /**
+     * Lists the event's discount codes.
+     *
+     * @param eventKey the event key
+     * @return the decoded response
+     */
+    public Map<String, Object> listEventDiscountCodes(String eventKey) {
+        return http.get("/v1/events/" + encode(eventKey) + "/discount-codes");
+    }
+
+    /**
+     * Creates a discount code for the event.
+     *
+     * <p>Single attempt, never retried automatically.
+     *
+     * @param eventKey the event key
+     * @param params the request body: {@code code} and {@code kind}, plus any optional fields
+     * @return the decoded response
+     */
+    public Map<String, Object> createEventDiscountCode(String eventKey, Map<String, Object> params) {
+        return http.post("/v1/events/" + encode(eventKey) + "/discount-codes", params);
+    }
+
+    /**
+     * Changes or pauses a discount code.
+     *
+     * <p>Single attempt, never retried automatically.
+     *
+     * @param eventKey the event key
+     * @param codeId the discount code id
+     * @param params the request body: the fields to change
+     * @return the decoded response
+     */
+    public Map<String, Object> updateEventDiscountCode(
+            String eventKey, String codeId, Map<String, Object> params) {
+        return http.patch(
+                "/v1/events/" + encode(eventKey) + "/discount-codes/" + encode(codeId), params);
+    }
+
+    /**
+     * Ends a discount code for good.
+     *
+     * <p>Single attempt; ending an ended code again has the same result.
+     *
+     * @param eventKey the event key
+     * @param codeId the discount code id
+     * @return the decoded response
+     */
+    public Map<String, Object> endEventDiscountCode(String eventKey, String codeId) {
+        return http.post(
+                "/v1/events/" + encode(eventKey) + "/discount-codes/" + encode(codeId) + "/end");
+    }
+
+    /**
+     * Deletes a discount code nobody has used. The API answers 204 No Content.
+     *
+     * <p>Single attempt, never retried automatically.
+     *
+     * @param eventKey the event key
+     * @param codeId the discount code id
+     */
+    public void deleteEventDiscountCode(String eventKey, String codeId) {
+        http.delete("/v1/events/" + encode(eventKey) + "/discount-codes/" + encode(codeId));
+    }
 }

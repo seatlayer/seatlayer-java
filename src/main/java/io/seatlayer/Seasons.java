@@ -282,4 +282,557 @@ public final class Seasons {
     public Map<String, Object> exportSeasonSupportSnapshot(String seasonKey) {
         return http.get(path(seasonKey, "/export"));
     }
+
+    /**
+     * Dry-runs or commits renewal rights derived from a previous Season's holders.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param params the request body: {@code sourceSeasonId} and {@code successorPlanActivationId},
+     *     and optionally {@code dryRun}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> createSeasonHolderImportFromSeason(
+            String seasonKey, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/imports/from-season"), params, idempotencyKey);
+    }
+
+    /**
+     * Lists the Season's performances and their package membership, in every lifecycle state.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response
+     */
+    public Map<String, Object> listSeasonPerformances(String seasonKey) {
+        return http.get(path(seasonKey, "/performances"));
+    }
+
+    /**
+     * Creates performances inside a draft Season from a repeat rule.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param params the request body: {@code titlePattern}, {@code timezone} and {@code repeat},
+     *     plus any optional fields
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> createSeasonPerformances(
+            String seasonKey, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(path(seasonKey, "/performances"), params, idempotencyKey);
+    }
+
+    /**
+     * Attaches existing Events to a draft Season and its packages.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param params the request body: {@code eventKeys}, and optionally {@code attachToPlanKeys}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> attachSeasonPerformances(
+            String seasonKey, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/performances/attach"), params, idempotencyKey);
+    }
+
+    /**
+     * Removes a performance from a draft Season and from every package.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param eventKey the performance's Event key
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> deleteSeasonPerformance(
+            String seasonKey, String eventKey, String idempotencyKey) {
+        return http.mutationWithHeaderReplay(
+                "DELETE", path(seasonKey, "/performances/" + encode(eventKey)), null, idempotencyKey);
+    }
+
+    /**
+     * Renames a draft package or changes the performances it covers.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param planKey the package (Plan) key
+     * @param params the request body: {@code name} and/or {@code eventKeys}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> updateSeasonPlan(
+            String seasonKey, String planKey, Map<String, Object> params, String idempotencyKey) {
+        return http.mutationWithHeaderReplay(
+                "PATCH", path(seasonKey, "/plans/" + encode(planKey)), params, idempotencyKey);
+    }
+
+    /**
+     * Deletes a draft package that is not the Season's last one. The API answers 204 No Content.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param planKey the package (Plan) key
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     */
+    public void deleteSeasonPlan(String seasonKey, String planKey, String idempotencyKey) {
+        http.mutationWithHeaderReplay(
+                "DELETE", path(seasonKey, "/plans/" + encode(planKey)), null, idempotencyKey);
+    }
+
+    /**
+     * Activates the Season structure and publishes every draft package in one retryable call.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> publishSeason(String seasonKey, String idempotencyKey) {
+        return http.postWithHeaderReplay(path(seasonKey, "/publish"), null, idempotencyKey);
+    }
+
+    /**
+     * Runs a server-side hold and release that proves the Season buyer path, with default options.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> createSeasonCheckoutTest(String seasonKey, String idempotencyKey) {
+        return createSeasonCheckoutTest(seasonKey, null, idempotencyKey);
+    }
+
+    /**
+     * Runs a server-side hold and release that proves the Season buyer path.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param params the optional request body ({@code planKey}, {@code quantity}), or {@code null}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> createSeasonCheckoutTest(
+            String seasonKey, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(path(seasonKey, "/checkout-tests"), params, idempotencyKey);
+    }
+
+    /**
+     * Lists recent Season checkout tests, newest first.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response
+     */
+    public Map<String, Object> listSeasonCheckoutTests(String seasonKey) {
+        return http.get(path(seasonKey, "/checkout-tests"));
+    }
+
+    /**
+     * Replaces a package's price table, per chart category, in minor units.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param planKey the package (Plan) key
+     * @param params the request body: {@code prices}, and optionally {@code currency}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> replaceSeasonPackagePrices(
+            String seasonKey, String planKey, Map<String, Object> params, String idempotencyKey) {
+        return http.mutationWithHeaderReplay(
+                "PUT", path(seasonKey, "/plans/" + encode(planKey) + "/prices"), params, idempotencyKey);
+    }
+
+    /**
+     * Lists every package price table for the Season.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response
+     */
+    public Map<String, Object> listSeasonPrices(String seasonKey) {
+        return http.get(path(seasonKey, "/prices"));
+    }
+
+    /**
+     * Adds a performance to a published package and extends its allocations.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param planKey the package (Plan) key
+     * @param params the request body: {@code eventKey}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> attachSeasonPlanPerformance(
+            String seasonKey, String planKey, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/plans/" + encode(planKey) + "/performances"), params, idempotencyKey);
+    }
+
+    /**
+     * Removes a performance from a published package and releases its allocations.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param planKey the package (Plan) key
+     * @param eventKey the performance's Event key
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> deleteSeasonPlanPerformance(
+            String seasonKey, String planKey, String eventKey, String idempotencyKey) {
+        return http.mutationWithHeaderReplay(
+                "DELETE",
+                path(seasonKey, "/plans/" + encode(planKey) + "/performances/" + encode(eventKey)),
+                null,
+                idempotencyKey);
+    }
+
+    /**
+     * Marks a performance past so it stops blocking new Season sales.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param eventKey the performance's Event key
+     * @param params the request body, which may be empty or carry {@code force}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> markSeasonPerformancePast(
+            String seasonKey, String eventKey, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/performances/" + encode(eventKey) + "/past"), params, idempotencyKey);
+    }
+
+    /**
+     * Returns one Season occurrence allocation to ordinary Event inventory.
+     *
+     * <p>Single attempt: the server makes a repeat with the same {@code actionId} exact, so
+     * reconcile an unknown outcome by sending the same body again yourself.
+     *
+     * @param seasonKey the Season key
+     * @param eventKey the occurrence's Event key
+     * @param params the request body: {@code actionId}, {@code bookingRef},
+     *     {@code planActivationId}, {@code labels} and {@code source}
+     * @return the decoded response
+     */
+    public Map<String, Object> returnSeasonOccurrenceInventory(
+            String seasonKey, String eventKey, Map<String, Object> params) {
+        return http.post(path(seasonKey, "/occurrences/" + encode(eventKey) + "/returns"), params);
+    }
+
+    /**
+     * Reclaims returned occurrence inventory while it is still free.
+     *
+     * <p>Single attempt: the server makes a repeat with the same {@code actionId} exact.
+     *
+     * @param seasonKey the Season key
+     * @param eventKey the occurrence's Event key
+     * @param params the request body: {@code actionId}, {@code returnActionId},
+     *     {@code bookingRef}, {@code planActivationId}, {@code labels} and {@code source}
+     * @return the decoded response
+     */
+    public Map<String, Object> reclaimSeasonOccurrenceInventory(
+            String seasonKey, String eventKey, Map<String, Object> params) {
+        return http.post(path(seasonKey, "/occurrences/" + encode(eventKey) + "/reclaims"), params);
+    }
+
+    /**
+     * Lists the first page of Season ticket holders.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response
+     */
+    public Map<String, Object> listSeasonHolders(String seasonKey) {
+        return listSeasonHolders(seasonKey, null, null, null, null);
+    }
+
+    /**
+     * Lists Season ticket holders, one page at a time. Null filters are not sent.
+     *
+     * @param seasonKey the Season key
+     * @param q search by holder name, email, reference, order number or seat, or {@code null}
+     * @param status only holders in this state, or {@code null}
+     * @param cursor the cursor from the previous page, or {@code null}
+     * @param limit the page size, or {@code null} for the server default
+     * @return the decoded response
+     */
+    public Map<String, Object> listSeasonHolders(
+            String seasonKey, String q, String status, String cursor, Integer limit) {
+        return http.get(
+                path(seasonKey, "/holders"),
+                body("q", q, "status", status, "cursor", cursor, "limit", limit));
+    }
+
+    /**
+     * Refunds a Season order in full through its payment provider.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param orderId the order id
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> refundSeasonOrder(
+            String seasonKey, String orderId, String idempotencyKey) {
+        return refundSeasonOrder(seasonKey, orderId, null, idempotencyKey);
+    }
+
+    /**
+     * Refunds a Season order in full or in part through its payment provider.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param orderId the order id
+     * @param params the optional request body ({@code amountMinor}), or {@code null} for a full refund
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> refundSeasonOrder(
+            String seasonKey, String orderId, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/orders/" + encode(orderId) + "/refund"), params, idempotencyKey);
+    }
+
+    /**
+     * Cancels a Season order without moving money and releases every date.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param orderId the order id
+     * @param params the request body: {@code reason}, plus any optional fields
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> cancelSeasonOrder(
+            String seasonKey, String orderId, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/orders/" + encode(orderId) + "/cancel"), params, idempotencyKey);
+    }
+
+    /**
+     * Takes back one date of a Season order and puts its seats back on sale.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param orderId the order id
+     * @param eventKey the date's Event key
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> cancelSeasonOrderDate(
+            String seasonKey, String orderId, String eventKey, String idempotencyKey) {
+        return cancelSeasonOrderDate(seasonKey, orderId, eventKey, null, idempotencyKey);
+    }
+
+    /**
+     * Takes back one date of a Season order and puts its seats back on sale.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param seasonKey the Season key
+     * @param orderId the order id
+     * @param eventKey the date's Event key
+     * @param params the optional request body ({@code actionId}), or {@code null}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
+    public Map<String, Object> cancelSeasonOrderDate(
+            String seasonKey,
+            String orderId,
+            String eventKey,
+            Map<String, Object> params,
+            String idempotencyKey) {
+        return http.postWithHeaderReplay(
+                path(seasonKey, "/orders/" + encode(orderId) + "/dates/" + encode(eventKey) + "/cancel"),
+                params,
+                idempotencyKey);
+    }
+
+    /**
+     * Emails a Season order's tickets again, to the address on the order.
+     *
+     * <p>Single attempt, never retried automatically.
+     *
+     * @param seasonKey the Season key
+     * @param orderId the order id
+     * @return the decoded response
+     */
+    public Map<String, Object> resendSeasonOrderTickets(String seasonKey, String orderId) {
+        return resendSeasonOrderTickets(seasonKey, orderId, null);
+    }
+
+    /**
+     * Emails a Season order's tickets again.
+     *
+     * <p>Single attempt, never retried automatically.
+     *
+     * @param seasonKey the Season key
+     * @param orderId the order id
+     * @param params the optional request body ({@code email}), or {@code null}
+     * @return the decoded response
+     */
+    public Map<String, Object> resendSeasonOrderTickets(
+            String seasonKey, String orderId, Map<String, Object> params) {
+        return http.post(path(seasonKey, "/orders/" + encode(orderId) + "/resend"), params);
+    }
+
+    /**
+     * Retrieves hosted renewal links, payments and emails per offer.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveSeasonHostedRenewals(String seasonKey) {
+        return http.get(path(seasonKey, "/renewal-hosted"));
+    }
+
+    /**
+     * Makes a new renewal link for one holder; the old link stops working.
+     *
+     * <p>Single attempt, never retried automatically: the new link is shown once.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @return the decoded response
+     */
+    public Map<String, Object> rotateSeasonRenewalOfferLink(String seasonKey, String offerId) {
+        return http.post(path(seasonKey, "/renewal-offers/" + encode(offerId) + "/link"));
+    }
+
+    /**
+     * Sets the name and email a renewal offer is sent to.
+     *
+     * <p>Single attempt; the server applies a repeat of the same contact exactly once.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @param params the request body: {@code email} and/or {@code name}
+     * @return the decoded response
+     */
+    public Map<String, Object> updateSeasonRenewalOfferContact(
+            String seasonKey, String offerId, Map<String, Object> params) {
+        return http.post(
+                path(seasonKey, "/renewal-offers/" + encode(offerId) + "/contact"), params);
+    }
+
+    /**
+     * Emails renewal invitations now, and reminders before the deadline, for every offer.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response
+     */
+    public Map<String, Object> createSeasonRenewalNotices(String seasonKey) {
+        return createSeasonRenewalNotices(seasonKey, null);
+    }
+
+    /**
+     * Emails renewal invitations now, and reminders before the deadline.
+     *
+     * <p>Single attempt; the server does not send the same notice twice.
+     *
+     * @param seasonKey the Season key
+     * @param params the optional request body ({@code offerIds}), or {@code null} for every offer
+     * @return the decoded response
+     */
+    public Map<String, Object> createSeasonRenewalNotices(
+            String seasonKey, Map<String, Object> params) {
+        return http.post(path(seasonKey, "/renewal-notices"), params);
+    }
+
+    /**
+     * Sends one holder a new renewal invitation.
+     *
+     * <p>Single attempt, never retried automatically.
+     *
+     * @param seasonKey the Season key
+     * @param offerId the renewal offer id
+     * @return the decoded response
+     */
+    public Map<String, Object> resendSeasonRenewalOffer(String seasonKey, String offerId) {
+        return http.post(path(seasonKey, "/renewal-offers/" + encode(offerId) + "/resend"));
+    }
+
+    /**
+     * Retrieves Season money, seats, holders and renewals as totals.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveSeasonSalesReport(String seasonKey) {
+        return http.get(path(seasonKey, "/reports/sales"));
+    }
+
+    /**
+     * Retrieves the seats still free per package and per date.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveSeasonSeatsReport(String seasonKey) {
+        return http.get(path(seasonKey, "/reports/seats"));
+    }
+
+    /**
+     * Downloads every Season ticket holder as CSV.
+     *
+     * @param seasonKey the Season key
+     * @return the CSV text, exactly as the API sent it
+     */
+    public String exportSeasonHoldersCsv(String seasonKey) {
+        return exportSeasonHoldersCsv(seasonKey, null, null);
+    }
+
+    /**
+     * Downloads the matching Season ticket holders as CSV. Null filters are not sent.
+     *
+     * @param seasonKey the Season key
+     * @param q search by holder name, email, reference, order number or seat, or {@code null}
+     * @param status only holders in this state, or {@code null}
+     * @return the CSV text, exactly as the API sent it
+     */
+    public String exportSeasonHoldersCsv(String seasonKey, String q, String status) {
+        return http.getText(path(seasonKey, "/reports/holders.csv"), body("q", q, "status", status));
+    }
+
+    /**
+     * Downloads every Season order SeatLayer took as CSV.
+     *
+     * @param seasonKey the Season key
+     * @return the CSV text, exactly as the API sent it
+     */
+    public String exportSeasonOrdersCsv(String seasonKey) {
+        return http.getText(path(seasonKey, "/reports/orders.csv"), null);
+    }
+
+    /**
+     * Retrieves Season seats sold per package and per date.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response
+     */
+    public Map<String, Object> retrieveSeasonSeatCounts(String seasonKey) {
+        return http.get(path(seasonKey, "/seat-counts"));
+    }
 }

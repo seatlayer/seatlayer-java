@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ final class SeasonTest {
     }
 
     @Test
-    void mapsAll48SeasonOperationsAndReplayClasses() {
+    void mapsAll80SeasonOperationsAndReplayClasses() {
         List<Call> calls = new ArrayList<>();
         SeatLayer sdk = SeatLayer.builder()
                 .secretKey("sk_test_abc")
@@ -75,8 +76,52 @@ final class SeasonTest {
         seasons.replaySeasonOutbox(key, "occurrence/1");
         seasons.listSeasonAudit(key);
         seasons.exportSeasonSupportSnapshot(key);
+        seasons.createSeasonHolderImportFromSeason(
+                key, Map.of("sourceSeasonId", "sea_2026", "successorPlanActivationId", "pa_1"), "from-1");
+        seasons.listSeasonPerformances(key);
+        seasons.createSeasonPerformances(
+                key,
+                Map.of("titlePattern", "Match", "timezone", "Europe/London", "repeat", "weekly", "count", 3),
+                "perf-1");
+        seasons.attachSeasonPerformances(key, Map.of("eventKeys", List.of("ev_1")), null);
+        seasons.deleteSeasonPerformance(key, "ev/1", "perf-del-1");
+        seasons.updateSeasonPlan(key, "plan/1", Map.of("name", "Gold"), "plan-upd-1");
+        seasons.deleteSeasonPlan(key, "plan/2", "plan-del-1");
+        seasons.publishSeason(key, "publish-1");
+        seasons.createSeasonCheckoutTest(key, Map.of("planKey", "plan/1", "quantity", 2), "test-1");
+        seasons.listSeasonCheckoutTests(key);
+        seasons.replaceSeasonPackagePrices(
+                key, "plan/1", Map.of("prices", List.of(Map.of("category", "A", "amountMinor", 5000))), "prices-1");
+        seasons.listSeasonPrices(key);
+        seasons.attachSeasonPlanPerformance(key, "plan/1", Map.of("eventKey", "ev_3"), "attach-1");
+        seasons.deleteSeasonPlanPerformance(key, "plan/1", "ev/3", "detach-1");
+        seasons.markSeasonPerformancePast(key, "ev/1", Map.of("force", true), "past-1");
+        seasons.returnSeasonOccurrenceInventory(key, "ev/1", Map.of(
+                "actionId", "ret_1", "bookingRef", "order_1", "planActivationId", "pa_1",
+                "labels", List.of("A-1"), "source", Map.of("kind", "holder")));
+        seasons.reclaimSeasonOccurrenceInventory(key, "ev/1", Map.of(
+                "actionId", "rec_1", "returnActionId", "ret_1", "bookingRef", "order_1",
+                "planActivationId", "pa_1", "labels", List.of("A-1"), "source", Map.of("kind", "holder")));
+        seasons.listSeasonHolders(key, "ann lee", "active", "c/2", 25);
+        seasons.refundSeasonOrder(key, "ord/1", Map.of("amountMinor", 500), "refund-1");
+        seasons.cancelSeasonOrder(key, "ord/1", Map.of("reason", "customer_request"), "cancel-order-1");
+        seasons.cancelSeasonOrderDate(key, "ord/1", "ev/2", "cancel-date-1");
+        seasons.resendSeasonOrderTickets(key, "ord/1", Map.of("email", "fan@example.com"));
+        seasons.retrieveSeasonHostedRenewals(key);
+        seasons.rotateSeasonRenewalOfferLink(key, "offer/1");
+        seasons.updateSeasonRenewalOfferContact(
+                key, "offer/1", Map.of("email", "fan@example.com", "name", "Ann Lee"));
+        seasons.createSeasonRenewalNotices(key);
+        seasons.resendSeasonRenewalOffer(key, "offer/1");
+        seasons.retrieveSeasonSalesReport(key);
+        seasons.retrieveSeasonSeatsReport(key);
+        String holdersCsv = seasons.exportSeasonHoldersCsv(key, "ann", "active");
+        String ordersCsv = seasons.exportSeasonOrdersCsv(key);
+        seasons.retrieveSeasonSeatCounts(key);
 
-        assertEquals(48, calls.size());
+        assertEquals(80, calls.size());
+        assertEquals("{}", holdersCsv);
+        assertEquals("{}", ordersCsv);
         assertNull(calls.get(26).body());
         List<String> expected = List.of(
                 "GET /v1/seasons?workspaceId=ws+1&structureState=draft&limit=20&cursor=c%2F1",
@@ -112,13 +157,47 @@ final class SeasonTest {
                 "GET /v1/seasons/sea%2Fa/support-lookups?holderRef=holder+a%2Fb",
                 "GET /v1/seasons/sea%2Fa/outbox",
                 "POST /v1/seasons/sea%2Fa/outbox/occurrence%2F1/replay",
-                "GET /v1/seasons/sea%2Fa/audit", "GET /v1/seasons/sea%2Fa/export");
+                "GET /v1/seasons/sea%2Fa/audit", "GET /v1/seasons/sea%2Fa/export",
+                "POST /v1/seasons/sea%2Fa/imports/from-season",
+                "GET /v1/seasons/sea%2Fa/performances",
+                "POST /v1/seasons/sea%2Fa/performances",
+                "POST /v1/seasons/sea%2Fa/performances/attach",
+                "DELETE /v1/seasons/sea%2Fa/performances/ev%2F1",
+                "PATCH /v1/seasons/sea%2Fa/plans/plan%2F1",
+                "DELETE /v1/seasons/sea%2Fa/plans/plan%2F2",
+                "POST /v1/seasons/sea%2Fa/publish",
+                "POST /v1/seasons/sea%2Fa/checkout-tests",
+                "GET /v1/seasons/sea%2Fa/checkout-tests",
+                "PUT /v1/seasons/sea%2Fa/plans/plan%2F1/prices",
+                "GET /v1/seasons/sea%2Fa/prices",
+                "POST /v1/seasons/sea%2Fa/plans/plan%2F1/performances",
+                "DELETE /v1/seasons/sea%2Fa/plans/plan%2F1/performances/ev%2F3",
+                "POST /v1/seasons/sea%2Fa/performances/ev%2F1/past",
+                "POST /v1/seasons/sea%2Fa/occurrences/ev%2F1/returns",
+                "POST /v1/seasons/sea%2Fa/occurrences/ev%2F1/reclaims",
+                "GET /v1/seasons/sea%2Fa/holders?q=ann+lee&status=active&cursor=c%2F2&limit=25",
+                "POST /v1/seasons/sea%2Fa/orders/ord%2F1/refund",
+                "POST /v1/seasons/sea%2Fa/orders/ord%2F1/cancel",
+                "POST /v1/seasons/sea%2Fa/orders/ord%2F1/dates/ev%2F2/cancel",
+                "POST /v1/seasons/sea%2Fa/orders/ord%2F1/resend",
+                "GET /v1/seasons/sea%2Fa/renewal-hosted",
+                "POST /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/link",
+                "POST /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/contact",
+                "POST /v1/seasons/sea%2Fa/renewal-notices",
+                "POST /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/resend",
+                "GET /v1/seasons/sea%2Fa/reports/sales",
+                "GET /v1/seasons/sea%2Fa/reports/seats",
+                "GET /v1/seasons/sea%2Fa/reports/holders.csv?q=ann&status=active",
+                "GET /v1/seasons/sea%2Fa/reports/orders.csv",
+                "GET /v1/seasons/sea%2Fa/seat-counts");
         List<String> actual = calls.stream()
                 .map(call -> call.method() + " " + call.url().substring("https://api.seatlayer.io".length()))
                 .toList();
         assertEquals(expected, actual);
 
-        List<Integer> replayIndexes = List.of(2, 4, 5, 10, 18, 27, 29, 38);
+        List<Integer> replayIndexes = List.of(
+                2, 4, 5, 10, 18, 27, 29, 38,
+                48, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 66, 67, 68);
         for (int index = 0; index < calls.size(); index++) {
             if (replayIndexes.contains(index)) {
                 assertTrue(calls.get(index).headers().containsKey("Idempotency-Key"));
@@ -126,5 +205,56 @@ final class SeasonTest {
                 assertNull(calls.get(index).headers().get("Idempotency-Key"));
             }
         }
+        assertEquals("from-1", calls.get(48).headers().get("Idempotency-Key"));
+        assertEquals("plan-del-1", calls.get(54).headers().get("Idempotency-Key"));
+        assertEquals("cancel-date-1", calls.get(68).headers().get("Idempotency-Key"));
+
+        // JSON bodies of the 32 operations added after the first 48, in call order; null means no body.
+        List<String> addedBodies = Arrays.asList(
+                "{\"sourceSeasonId\":\"sea_2026\",\"successorPlanActivationId\":\"pa_1\"}",
+                null,
+                "{\"titlePattern\":\"Match\",\"timezone\":\"Europe/London\",\"repeat\":\"weekly\",\"count\":3}",
+                "{\"eventKeys\":[\"ev_1\"]}",
+                null,
+                "{\"name\":\"Gold\"}",
+                null,
+                null,
+                "{\"planKey\":\"plan/1\",\"quantity\":2}",
+                null,
+                "{\"prices\":[{\"category\":\"A\",\"amountMinor\":5000}]}",
+                null,
+                "{\"eventKey\":\"ev_3\"}",
+                null,
+                "{\"force\":true}",
+                "{\"actionId\":\"ret_1\",\"bookingRef\":\"order_1\",\"planActivationId\":\"pa_1\","
+                        + "\"labels\":[\"A-1\"],\"source\":{\"kind\":\"holder\"}}",
+                "{\"actionId\":\"rec_1\",\"returnActionId\":\"ret_1\",\"bookingRef\":\"order_1\","
+                        + "\"planActivationId\":\"pa_1\",\"labels\":[\"A-1\"],\"source\":{\"kind\":\"holder\"}}",
+                null,
+                "{\"amountMinor\":500}",
+                "{\"reason\":\"customer_request\"}",
+                null,
+                "{\"email\":\"fan@example.com\"}",
+                null,
+                null,
+                "{\"email\":\"fan@example.com\",\"name\":\"Ann Lee\"}",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+        assertEquals(32, addedBodies.size());
+        for (int offset = 0; offset < addedBodies.size(); offset++) {
+            Call call = calls.get(48 + offset);
+            String label = "call " + (48 + offset) + " " + expected.get(48 + offset);
+            if (addedBodies.get(offset) == null) {
+                assertNull(call.body(), label);
+            } else {
+                assertEquals(Json.read(addedBodies.get(offset)), Json.read(call.body()), label);
+            }
+        }
+        assertTrue(calls.get(77).headers().get("Accept").startsWith("text/csv"));
     }
 }

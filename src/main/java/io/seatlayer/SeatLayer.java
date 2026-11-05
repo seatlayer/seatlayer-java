@@ -20,7 +20,10 @@ public final class SeatLayer {
     private final Charts charts;
     private final Channels channels;
     private final Events events;
+    private final EventSeries eventSeries;
+    private final Holders holders;
     private final Inventory inventory;
+    private final Orders orders;
     private final PerformanceGroups performanceGroups;
     private final Seasons seasons;
     private final Sessions sessions;
@@ -38,7 +41,10 @@ public final class SeatLayer {
         this.charts = new Charts(http);
         this.channels = new Channels(http);
         this.events = new Events(http);
+        this.eventSeries = new EventSeries(http);
+        this.holders = new Holders(http);
         this.inventory = new Inventory(http);
+        this.orders = new Orders(http);
         this.performanceGroups = new PerformanceGroups(http);
         this.seasons = new Seasons(http);
         this.sessions = new Sessions(http);
@@ -64,8 +70,35 @@ public final class SeatLayer {
         return events;
     }
 
+    /**
+     * Event series: dated events planned from one schedule and changed together.
+     *
+     * @return the event series resource
+     */
+    public EventSeries eventSeries() {
+        return eventSeries;
+    }
+
+    /**
+     * Season ticket holders, their tickets and transfers, and the customer list.
+     *
+     * @return the holders resource
+     */
+    public Holders holders() {
+        return holders;
+    }
+
     public Inventory inventory() {
         return inventory;
+    }
+
+    /**
+     * Orders across events and seasons, and one event's orders, refunds and cancellations.
+     *
+     * @return the orders resource
+     */
+    public Orders orders() {
+        return orders;
     }
 
     /** Fixed multi-performance lifecycle and host-side booking coordination. */
