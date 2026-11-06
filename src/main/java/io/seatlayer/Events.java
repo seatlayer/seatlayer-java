@@ -138,6 +138,13 @@ public final class Events {
         return http.post("/v1/events/" + encode(eventKey) + "/close");
     }
 
+    /**
+     * Opens a paused event's sales again. A date its season cancelled never opens again:
+     * {@code 409 season_date_cancelled}.
+     *
+     * @param eventKey the event key
+     * @return the decoded response
+     */
     public Map<String, Object> reopen(String eventKey) {
         return http.post("/v1/events/" + encode(eventKey) + "/reopen");
     }
@@ -292,7 +299,9 @@ public final class Events {
     }
 
     /**
-     * Moves the event's sales to testable, live, paused or ended.
+     * Moves the event's sales to testable, live, paused or ended. A date its season cancelled
+     * never opens again: moving it to {@code testable} or {@code live} answers
+     * {@code 409 season_date_cancelled}.
      *
      * <p>Single attempt; the {@code expectedRevision} compare-and-set makes a repeat safe to
      * reconcile.

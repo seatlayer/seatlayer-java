@@ -423,7 +423,8 @@ public final class Seasons {
      * <p>A {@code cancel} also voids every live ticket for the date as a {@code date_cancel_void}
      * job, {@link #dateCancelVoidJobId(String)} of the answer's {@code amendmentId}; follow it with
      * {@link #retrieveSeasonBulkJob}. Each Season ticket it voids is told by
-     * {@code season.ticket.voided} with reason {@code date_cancelled}.
+     * {@code season.ticket.voided} with reason {@code date_cancelled}. A cancelled date can't be
+     * moved ({@code reschedule}), postponed or replaced: {@code 409 performance_cancelled}.
      *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *
@@ -715,7 +716,8 @@ public final class Seasons {
     }
 
     /**
-     * Marks a performance past so it stops blocking new Season sales.
+     * Marks a performance past so it stops blocking new Season sales. A cancelled date answers
+     * {@code 409 performance_cancelled}.
      *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *

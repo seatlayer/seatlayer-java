@@ -99,6 +99,10 @@ public final class EventSeries {
      * <p>{@code prices} takes {@code categories}: only the categories whose price changes (for a
      * tiered category, only the tiers sent). Every price left out keeps each date's own value.
      *
+     * <p>{@code sales: "on"} never opens a date its season cancelled: that date is a failed item
+     * of the job ({@code season_date_cancelled}), counted in the job's {@code failed} but not in
+     * {@code failedDates}, which are the dates that could not be made.
+     *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *
      * @param eventKey the series' event key
