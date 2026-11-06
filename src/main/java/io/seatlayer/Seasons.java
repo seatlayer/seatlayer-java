@@ -4,6 +4,7 @@ import static io.seatlayer.SeatLayerHttpClient.body;
 import static io.seatlayer.SeatLayerHttpClient.encode;
 
 import java.util.Map;
+import java.util.Objects;
 
 /** Fixed Renewable Season organizer operations for trusted backends. */
 public final class Seasons {
@@ -16,6 +17,37 @@ public final class Seasons {
 
     private static String path(String seasonKey, String suffix) {
         return "/v1/seasons/" + encode(seasonKey) + suffix;
+    }
+
+    /**
+     * The job voiding a cancelled date's tickets: {@code sbj_void_} and the cancel's
+     * {@code amendmentId}. Cancelling a date starts it (a repeated cancel joins it); follow it with
+     * {@link #retrieveSeasonBulkJob}. Each Season ticket it voids is told by
+     * {@code season.ticket.voided} with reason {@code date_cancelled}.
+     *
+     * <p>Not an API call: the cancel's answer does not name the job, so this names it.
+     *
+     * @param amendmentId the {@code amendmentId} of the {@code cancel} amendment
+     * @return the {@code date_cancel_void} job id
+     */
+    public static String dateCancelVoidJobId(String amendmentId) {
+        return "sbj_void_" + Objects.requireNonNull(amendmentId, "amendmentId");
+    }
+
+    /**
+     * The most rows one {@link #createSeasonHolderImport} call takes for a package of
+     * {@code dates} dates. Each row is fenced on every date: 100 up to 20 dates, then
+     * {@code floor(2300 / (dates + 3))}, 43 at 50. A call with more answers
+     * {@code 422 invalid_rows} with {@code maxRows}.
+     *
+     * <p>Not an API call.
+     *
+     * @param dates the number of dates in the package (2 to 50)
+     * @return the most rows one import call takes, at least 1
+     */
+    public static int holderImportRowsPerCall(int dates) {
+        long perCall = 2300L / (Math.max(1, dates) + 3L);
+        return (int) Math.max(1, Math.min(100, perCall));
     }
 
     public Map<String, Object> listSeasons() {
@@ -65,7 +97,12 @@ public final class Seasons {
     /**
      * Renames a draft Season, or sets how it sells.
      *
-     * <p>Header replay: the same idempotency key is reused on every retry.
+     * <p>Header replay: the same idempotency key is reused on every retry. A retry with the first
+     * key and the same {@code expectedRevision} is not applied twice.
+     *
+     * <p>When a {@code season_singles} job could not start, {@code singleTicketDates} carries
+     * {@code jobRefused} saying why. The change still stands, and the dates wait in
+     * {@code singleTicketsNotOpen} until you send {@code singleTickets: true} again.
      *
      * @param seasonKey the Season key
      * @param params the request body: {@code expectedRevision}, plus any of {@code name},
@@ -224,6 +261,11 @@ public final class Seasons {
     /**
      * Imports incumbent holders, as a dry run or for real.
      *
+     * <p>A package holds 2 to 50 dates. A call takes at most
+     * {@link #holderImportRowsPerCall(int)} rows for the package's dates (100 up to 20 dates, 43
+     * at 50); more is refused with {@code 422 invalid_rows}, and the error's {@code body()} carries
+     * {@code maxRows}.
+     *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *
      * @param seasonKey the Season key
@@ -376,6 +418,11 @@ public final class Seasons {
 
     /**
      * Amends one date of a published Season.
+     *
+     * <p>A {@code cancel} also voids every live ticket for the date as a {@code date_cancel_void}
+     * job, {@link #dateCancelVoidJobId(String)} of the answer's {@code amendmentId}; follow it with
+     * {@link #retrieveSeasonBulkJob}. Each Season ticket it voids is told by
+     * {@code season.ticket.voided} with reason {@code date_cancelled}.
      *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *

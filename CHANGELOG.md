@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- Cancelling a date voids its tickets as a `date_cancel_void` job, named by
+  `Seasons.dateCancelVoidJobId(amendmentId)` (`sbj_void_…`); follow it with
+  `retrieveSeasonBulkJob`. `season.ticket.voided` says `date_cancelled` for each season ticket it
+  voids.
+- A Season package holds 2 to 50 dates. `Seasons.holderImportRowsPerCall(dates)` gives the most
+  rows one `createSeasonHolderImport` call takes (100 up to 20 dates, 43 at 50); a call with more
+  answers `422 invalid_rows` with `maxRows` in the error's `body()`.
+- `updateSeason`'s `singleTicketDates` can carry `jobRefused`, why a `season_singles` job could
+  not start; the change stands, and sending `singleTickets: true` again opens any date still not
+  open. An `updateSeason` retried with its first key and `expectedRevision` is not applied twice.
+- `eventSeries().createEventSeries`: a series create given up for its key answers
+  `409 create_abandoned` with a message to send it again with a new idempotency key.
 - Added 39 Season operations to `seasons()`, for 87 in all: performances, package prices, plan
   edits and deletion, one-call publish, checkout tests, occurrence returns and reclaims, holders,
   Season order refunds and cancellations, hosted renewals, renewal links and notices, renewal

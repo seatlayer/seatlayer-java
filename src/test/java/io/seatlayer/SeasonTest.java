@@ -2,6 +2,7 @@ package io.seatlayer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -334,5 +335,36 @@ final class SeasonTest {
         }
         assertTrue(calls.get(1).body().contains("\"returnCutoffHours\":null"));
         assertEquals("night-3-storm", calls.get(3).headers().get("Idempotency-Key"));
+    }
+
+    @Test
+    void namesTheDateCancelVoidJobAndSizesAHolderImportCallByItsDates() {
+        assertEquals("sbj_void_amd_1", Seasons.dateCancelVoidJobId("amd_1"));
+        assertEquals(
+                List.of(100, 100, 95, 43),
+                List.of(1, 20, 21, 50).stream().map(Seasons::holderImportRowsPerCall).toList());
+
+        List<Call> calls = new ArrayList<>();
+        SeatLayer sdk = SeatLayer.builder()
+                .secretKey("sk_test_abc")
+                .transport((method, url, headers, requestBody) -> {
+                    calls.add(new Call(method, url, Map.copyOf(headers), requestBody));
+                    return new SeatLayerHttpClient.Response(
+                            422,
+                            "{\"error\":\"invalid_rows\",\"code\":\"invalid_rows\","
+                                    + "\"message\":\"At most 43 rows a call for this package.\",\"maxRows\":43}",
+                            Map.of());
+                })
+                .build();
+
+        SeatLayerValidationException error = assertThrows(
+                SeatLayerValidationException.class,
+                () -> sdk.seasons().createSeasonHolderImport(
+                        "sea_1", Map.of("successorPlanActivationId", "pa_1", "rows", List.of()), null));
+
+        assertEquals(422, error.status());
+        assertEquals("invalid_rows", error.code());
+        assertEquals(43L, error.body().get("maxRows"));
+        assertEquals(1, calls.size());
     }
 }

@@ -26,7 +26,9 @@ public final class EventSeries {
      * Plans an event series from a schedule, or makes it as a job.
      *
      * <p>Header replay: the same idempotency key is reused on every retry. The API answers
-     * 202 when the dates are made as a job.
+     * 202 when the dates are made as a job. A series from an event that never started and was
+     * given up answers {@code 409 create_abandoned} for that key every time: send the request
+     * again with a new idempotency key.
      *
      * <p>Every date carries the series name as its name. Give {@code name} and {@code chartKey},
      * or {@code fromEventKey}: an event you already set up becomes the first date under its own

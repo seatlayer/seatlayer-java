@@ -288,6 +288,33 @@ final class SeasonPlatformTest {
     }
 
     @Test
+    void givenUpSeriesCreateAnswers409CreateAbandonedOnceWithTheNewKeyMessage() {
+        // The default client retries a header-replay create (3 attempts); the queued 202 would
+        // answer a retry, so a single call proves the 409 is not retried.
+        SeatLayer sdk = client(List.of(
+                new SeatLayerHttpClient.Response(
+                        409,
+                        "{\"error\":\"create_abandoned\",\"code\":\"create_abandoned\",\"message\":\"This series"
+                                + " never started and was given up when another request came for the event."
+                                + " Send the request again with a new Idempotency-Key.\"}",
+                        Map.of()),
+                new SeatLayerHttpClient.Response(202, "{\"job\":{\"jobId\":\"job_1\"}}", Map.of())));
+        Map<String, Object> schedule = Map.of(
+                "rule", "daily", "from", "2026-11-06", "until", "2026-11-08", "times", List.of("20:00"));
+
+        SeatLayerConflictException error = assertThrows(
+                SeatLayerConflictException.class,
+                () -> sdk.eventSeries().createEventSeries(
+                        Map.of("fromEventKey", "ev_1", "schedule", schedule), "series-3"));
+
+        assertEquals(409, error.status());
+        assertEquals("create_abandoned", error.code());
+        assertTrue(error.getMessage().contains("new Idempotency-Key"), error.getMessage());
+        assertEquals(1, calls.size());
+        assertEquals("series-3", calls.get(0).headers().get("Idempotency-Key"));
+    }
+
+    @Test
     void csvExportsReturnTheRawText() {
         // Not JSON on purpose: decoding it would throw.
         String csv = "order,buyer\nord_1,\"Lee, Ann\"\n";
