@@ -397,6 +397,18 @@ final class SeasonPlatformTest {
     }
 
     @Test
+    void renewalNoticesForOneOfferBatchSendItsBatchId() {
+        SeatLayer sdk = client("{\"scheduled\":240,\"withoutEmail\":3}");
+
+        Map<String, Object> sent =
+                sdk.seasons().createSeasonRenewalNotices("sea/a", Map.of("batchId", "srb/1"));
+
+        assertEquals(Json.read("{\"scheduled\":240,\"withoutEmail\":3}"), sent);
+        assertCalls(List.of(
+                new Expected("POST /v1/seasons/sea%2Fa/renewal-notices", "{\"batchId\":\"srb/1\"}", false)));
+    }
+
+    @Test
     void renewalRunAndBringAcrossAnswerAJobAbove100() {
         String renewalRun = "{\"job\":{\"jobId\":\"sbj_3\",\"kind\":\"renewal_run\",\"state\":\"planning\"},"
                 + "\"batchId\":\"srb_1\"}";

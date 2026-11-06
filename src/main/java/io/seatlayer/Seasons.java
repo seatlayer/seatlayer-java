@@ -915,7 +915,8 @@ public final class Seasons {
      *
      * @param seasonKey the Season key
      * @param params the optional request body ({@code offerIds}, at most 20,000; more is refused
-     *     with {@code 422 too_many_offer_ids}), or {@code null} for every open offer
+     *     with {@code 422 too_many_offer_ids}; or instead {@code batchId}, every open offer one
+     *     {@code createSeasonRenewalOffers} batch made), or {@code null} for every open offer
      * @return the decoded response
      */
     public Map<String, Object> createSeasonRenewalNotices(
