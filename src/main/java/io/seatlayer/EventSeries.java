@@ -96,6 +96,9 @@ public final class EventSeries {
     /**
      * Changes the name, prices or sales of every upcoming date in the series.
      *
+     * <p>{@code prices} takes {@code categories}: only the categories whose price changes (for a
+     * tiered category, only the tiers sent). Every price left out keeps each date's own value.
+     *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *
      * @param eventKey the series' event key

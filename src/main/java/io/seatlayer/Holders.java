@@ -152,7 +152,8 @@ public final class Holders {
     }
 
     /**
-     * Sends some of a holder's season tickets to an email.
+     * Sends some of a holder's season tickets to an email. Turning customer sends off in Settings ›
+     * Ticket site doesn't stop your server; cut-offs still apply.
      *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *
@@ -203,7 +204,8 @@ public final class Holders {
     }
 
     /**
-     * Gives back a holder's seat on one date, one per ticket.
+     * Gives back a holder's seat on one date, one per ticket. Turning give-backs off in Settings ›
+     * Ticket site doesn't stop your server; cut-offs still apply.
      *
      * <p>Header replay: the same idempotency key is reused on every retry. A repeat answers with
      * the same return.

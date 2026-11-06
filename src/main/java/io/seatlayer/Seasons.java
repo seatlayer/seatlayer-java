@@ -109,7 +109,8 @@ public final class Seasons {
      *     {@code edition}, {@code checkoutMode} ({@code seatlayer} or {@code server}; it cannot go
      *     back to undecided and is fixed once a live booking exists), {@code transferCutoffHours}
      *     and {@code returnCutoffHours} (hours before a date starts, 0 to 720, or {@code null} for
-     *     until it starts), {@code audience} ({@code embed_only} or {@code public}; an ended
+     *     the club default in Settings › Ticket site, or until it starts when the club has none),
+     *     {@code audience} ({@code embed_only} or {@code public}; an ended
      *     Season cannot become public, {@code 409 sales_ended}), and {@code singleTickets} (turned
      *     on while the Season is on sale, each upcoming date's own sales open through its
      *     readiness checks; turned off, they stop)
