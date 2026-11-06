@@ -397,6 +397,25 @@ final class SeasonPlatformTest {
     }
 
     @Test
+    void singleTicketsReachTheWireOnCreateAndUpdate() {
+        String updated = "{\"season\":{\"key\":\"sea_1\",\"singleTickets\":true},\"singleTicketDates\":"
+                + "{\"direction\":\"open\",\"opened\":[\"ev_1\"],\"closed\":[],\"notOpened\":[],\"jobId\":null}}";
+        SeatLayer sdk = client(updated);
+
+        sdk.seasons().createSeason(
+                Map.of("name", "Series", "eventKeys", List.of("ev_1", "ev_2"), "singleTickets", true), "create-1");
+        Map<String, Object> answer = sdk.seasons().updateSeason(
+                "sea/a", Map.of("expectedRevision", 5, "singleTickets", false), "update-1");
+
+        assertEquals(Json.read(updated), answer);
+        assertCalls(List.of(
+                new Expected(
+                        "POST /v1/seasons",
+                        "{\"name\":\"Series\",\"eventKeys\":[\"ev_1\",\"ev_2\"],\"singleTickets\":true}", true),
+                new Expected("PATCH /v1/seasons/sea%2Fa", "{\"expectedRevision\":5,\"singleTickets\":false}", true)));
+    }
+
+    @Test
     void renewalNoticesForOneOfferBatchSendItsBatchId() {
         SeatLayer sdk = client("{\"scheduled\":240,\"withoutEmail\":3}");
 

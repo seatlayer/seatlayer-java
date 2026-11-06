@@ -42,6 +42,18 @@ public final class Seasons {
         return createSeason(params, null);
     }
 
+    /**
+     * Creates a draft Season.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry.
+     *
+     * @param params the request body: {@code name}, {@code eventKeys} or
+     *     {@code sourcePerformanceGroupKeys}, and optionally {@code edition}, {@code mode} and
+     *     {@code singleTickets} ({@code true}: each date also sells its own single tickets once
+     *     the Season is on sale; the default {@code false} is Season only)
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response
+     */
     public Map<String, Object> createSeason(Map<String, Object> params, String idempotencyKey) {
         return http.postWithHeaderReplay("/v1/seasons", params, idempotencyKey);
     }
@@ -60,10 +72,13 @@ public final class Seasons {
      *     {@code edition}, {@code checkoutMode} ({@code seatlayer} or {@code server}; it cannot go
      *     back to undecided and is fixed once a live booking exists), {@code transferCutoffHours}
      *     and {@code returnCutoffHours} (hours before a date starts, 0 to 720, or {@code null} for
-     *     until it starts), and {@code audience} ({@code embed_only} or {@code public}; an ended
-     *     Season cannot become public, {@code 409 sales_ended})
+     *     until it starts), {@code audience} ({@code embed_only} or {@code public}; an ended
+     *     Season cannot become public, {@code 409 sales_ended}), and {@code singleTickets} (turned
+     *     on while the Season is on sale, each upcoming date's own sales open through its
+     *     readiness checks; turned off, they stop)
      * @param idempotencyKey a stable key, or {@code null} to generate one
-     * @return the decoded response
+     * @return the decoded response; a change to {@code singleTickets} names the dates it opened
+     *     or stopped in {@code singleTicketDates}
      */
     public Map<String, Object> updateSeason(
             String seasonKey, Map<String, Object> params, String idempotencyKey) {
