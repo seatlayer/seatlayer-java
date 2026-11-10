@@ -50,6 +50,25 @@ public final class Seasons {
         return (int) Math.max(1, Math.min(100, perCall));
     }
 
+    /**
+     * Whether an answer is the {@code 202} a season-seats season's date cancel
+     * ({@link #createSeasonAmendment}) or past date ({@link #markSeasonPerformancePast}) sends
+     * while the date is still leaving every season seat: {@code state} {@code finishing},
+     * {@code code} {@code block_date_leave_pending}, with {@code eventKey}, {@code shardsLeft}
+     * and {@code shardCount}. It finishes by itself: send the same request again after
+     * {@code Retry-After} to read how it ended.
+     *
+     * <p>Not an API call.
+     *
+     * @param answer a decoded response, or {@code null}
+     * @return true for the date-leave {@code 202}
+     */
+    public static boolean isDateLeavePending(Map<String, Object> answer) {
+        return answer != null
+                && "finishing".equals(answer.get("state"))
+                && "block_date_leave_pending".equals(answer.get("code"));
+    }
+
     public Map<String, Object> listSeasons() {
         return http.get("/v1/seasons");
     }
@@ -79,10 +98,16 @@ public final class Seasons {
      *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *
+     * <p>Every Season answer carries {@code inventoryMode}: how the season's seats are decided,
+     * {@code block} once season seats are turned on for it ({@code inventoryMode: "block"} on
+     * create or update) or it sells from its block, else {@code per_hold}.
+     *
      * @param params the request body: {@code name}, {@code eventKeys} or
-     *     {@code sourcePerformanceGroupKeys}, and optionally {@code edition}, {@code mode} and
+     *     {@code sourcePerformanceGroupKeys}, and optionally {@code edition}, {@code mode},
      *     {@code singleTickets} ({@code true}: each date also sells its own single tickets once
-     *     the Season is on sale; the default {@code false} is Season only)
+     *     the Season is on sale; the default {@code false} is Season only) and
+     *     {@code inventoryMode} ({@code block} turns season seats on for this Season; the default
+     *     is {@code per_hold}, and anything else answers {@code 422 invalid_inventory_mode})
      * @param idempotencyKey a stable key, or {@code null} to generate one
      * @return the decoded response
      */
@@ -111,9 +136,14 @@ public final class Seasons {
      *     and {@code returnCutoffHours} (hours before a date starts, 0 to 720, or {@code null} for
      *     the club default in Settings › Ticket site, or until it starts when the club has none),
      *     {@code audience} ({@code embed_only} or {@code public}; an ended
-     *     Season cannot become public, {@code 409 sales_ended}), and {@code singleTickets} (turned
+     *     Season cannot become public, {@code 409 sales_ended}), {@code singleTickets} (turned
      *     on while the Season is on sale, each upcoming date's own sales open through its
-     *     readiness checks; turned off, they stop)
+     *     readiness checks; turned off, they stop), and {@code inventoryMode} ({@code block}
+     *     turns season seats on for this Season; {@code per_hold} turns them off again, refused
+     *     with {@code 409 season_block_exists} once seats are set aside; it does not change the
+     *     Season's {@code revision}; refused with {@code 409 season_block_packages} (more than one
+     *     package), {@code 409 season_block_on_sale} (sales already opened without season seats),
+     *     {@code 409 season_not_draft_or_active}, or {@code 422 invalid_inventory_mode})
      * @param idempotencyKey a stable key, or {@code null} to generate one
      * @return the decoded response; a change to {@code singleTickets} names the dates it opened
      *     or stopped in {@code singleTicketDates}
@@ -175,7 +205,8 @@ public final class Seasons {
      * Opens sales. The answer's {@code warnings} say what is advised but not required, such as
      * {@code checkout_test_missing} until a checkout test or rehearsal has passed. Refused with
      * {@code 409 plan_not_published} or {@code 409 checkout_mode_not_chosen} until a package is
-     * published and a checkout mode is chosen.
+     * published and a checkout mode is chosen, and with {@code 409 block_not_ready} when season
+     * seats are turned on ({@code inventoryMode} {@code block}) but the seats are not set aside yet.
      *
      * @param seasonKey the Season key
      * @param expectedRevision the Season revision the caller last read
@@ -424,7 +455,10 @@ public final class Seasons {
      * job, {@link #dateCancelVoidJobId(String)} of the answer's {@code amendmentId}; follow it with
      * {@link #retrieveSeasonBulkJob}. Each Season ticket it voids is told by
      * {@code season.ticket.voided} with reason {@code date_cancelled}. A cancelled date can't be
-     * moved ({@code reschedule}), postponed or replaced: {@code 409 performance_cancelled}.
+     * moved ({@code reschedule}), postponed or replaced: {@code 409 performance_cancelled}. On a
+     * season-seats season, a {@code cancel} first takes the date off every season seat: while
+     * that finishes the answer is a {@code 202} (check with {@link #isDateLeavePending}); send the
+     * same request again to read the amendment.
      *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *
@@ -717,7 +751,9 @@ public final class Seasons {
 
     /**
      * Marks a performance past so it stops blocking new Season sales. A cancelled date answers
-     * {@code 409 performance_cancelled}.
+     * {@code 409 performance_cancelled}. On a season-seats season the date first leaves every
+     * season seat: while that finishes the answer is a {@code 202} (check with
+     * {@link #isDateLeavePending}).
      *
      * <p>Header replay: the same idempotency key is reused on every retry.
      *
@@ -1167,5 +1203,61 @@ public final class Seasons {
      */
     public Map<String, Object> retrieveSeasonBulkJob(String seasonKey, String jobId) {
         return http.get(path(seasonKey, "/jobs/" + encode(jobId)));
+    }
+
+    /**
+     * Sets the Season's seats aside on every date: every seat its packages price, minus
+     * {@code keepForSingleTickets}. The answer is {@code 202} with the {@code job} (a
+     * {@code season_block_set_aside} job to follow with {@link #retrieveSeasonBulkJob}) and the
+     * {@code block}. On an active Season block mode turns on by itself once every date has the
+     * seats ({@code season.block.ready}); on a draft, Publish turns it on. Season seats must be on
+     * for the Season ({@code 409 season_block_not_enabled} otherwise).
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry and replays the same
+     * answer.
+     *
+     * @param seasonKey the Season key
+     * @param params the request body: {@code expectedRevision}, and optionally
+     *     {@code keepForSingleTickets} ({@code sectionIds}, {@code categoryKeys} or {@code labels})
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response, with the {@code job} and the {@code block}
+     */
+    public Map<String, Object> setAsideSeasonBlock(
+            String seasonKey, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(path(seasonKey, "/block"), params, idempotencyKey);
+    }
+
+    /**
+     * Retrieves the Season's seats set aside on every date: the {@code block} with its
+     * {@code mode} ({@code block} once on, else {@code per_hold}), {@code state}, {@code counts}
+     * and each date's {@code state}.
+     *
+     * @param seasonKey the Season key
+     * @return the decoded response, with the {@code block}
+     */
+    public Map<String, Object> retrieveSeasonBlock(String seasonKey) {
+        return http.get(path(seasonKey, "/block"));
+    }
+
+    /**
+     * Releases season seats to single sale: every unsold seat ({@code scope}
+     * {@code {"all": true}}), or the sections, categories or seats named. The answer is
+     * {@code 202} with the {@code job} (a {@code season_block_release} job to follow with
+     * {@link #retrieveSeasonBulkJob}) and the {@code block}. {@code season.block.released} is sent
+     * once it has run on every date.
+     *
+     * <p>Header replay: the same idempotency key is reused on every retry and replays the same
+     * release.
+     *
+     * @param seasonKey the Season key
+     * @param params the request body: {@code expectedRevision} and {@code scope}, and optionally
+     *     {@code eventKeys} (those dates only; left out, every date still to come), {@code at}
+     *     (an ISO time to release at; left out, now) and {@code reason}
+     * @param idempotencyKey a stable key, or {@code null} to generate one
+     * @return the decoded response, with the {@code job} and the {@code block}
+     */
+    public Map<String, Object> releaseSeasonBlock(
+            String seasonKey, Map<String, Object> params, String idempotencyKey) {
+        return http.postWithHeaderReplay(path(seasonKey, "/block/release"), params, idempotencyKey);
     }
 }

@@ -443,6 +443,78 @@ final class SeasonPlatformTest {
     }
 
     @Test
+    void inventoryModeReachesTheWireOnlyWhenGivenAndReadsBack() {
+        String block = "{\"season\":{\"key\":\"sea_1\",\"revision\":5,\"inventoryMode\":\"block\"}}";
+        String perHold = "{\"season\":{\"key\":\"sea_2\",\"revision\":1,\"inventoryMode\":\"per_hold\"}}";
+        String list = "{\"seasons\":[{\"key\":\"sea_1\",\"inventoryMode\":\"block\"},"
+                + "{\"key\":\"sea_2\",\"inventoryMode\":\"per_hold\"}],\"nextCursor\":null}";
+        SeatLayer sdk = client(List.of(ok(block), ok(perHold), ok(block), ok(perHold), ok(perHold), ok(block), ok(list)));
+
+        Map<String, Object> created = sdk.seasons().createSeason(
+                Map.of("name", "Series", "eventKeys", List.of("ev_1", "ev_2"), "inventoryMode", "block"), "create-1");
+        sdk.seasons().createSeason(Map.of("name", "Series", "eventKeys", List.of("ev_1", "ev_2")), "create-2");
+        Map<String, Object> turnedOn = sdk.seasons().updateSeason(
+                "sea_1", Map.of("expectedRevision", 5, "inventoryMode", "block"), "update-1");
+        sdk.seasons().updateSeason("sea_1", Map.of("expectedRevision", 5, "inventoryMode", "per_hold"), "update-2");
+        sdk.seasons().updateSeason("sea_1", Map.of("expectedRevision", 5, "name", "Series 2"), "update-3");
+        Map<String, Object> retrieved = sdk.seasons().retrieveSeason("sea_1");
+        Map<String, Object> listed = sdk.seasons().listSeasons();
+
+        assertCalls(List.of(
+                new Expected(
+                        "POST /v1/seasons",
+                        "{\"name\":\"Series\",\"eventKeys\":[\"ev_1\",\"ev_2\"],\"inventoryMode\":\"block\"}", true),
+                new Expected("POST /v1/seasons", "{\"name\":\"Series\",\"eventKeys\":[\"ev_1\",\"ev_2\"]}", true),
+                new Expected("PATCH /v1/seasons/sea_1", "{\"expectedRevision\":5,\"inventoryMode\":\"block\"}", true),
+                new Expected("PATCH /v1/seasons/sea_1", "{\"expectedRevision\":5,\"inventoryMode\":\"per_hold\"}", true),
+                new Expected("PATCH /v1/seasons/sea_1", "{\"expectedRevision\":5,\"name\":\"Series 2\"}", true),
+                new Expected("GET /v1/seasons/sea_1", null, false),
+                new Expected("GET /v1/seasons", null, false)));
+        assertEquals("block", season(created).get("inventoryMode"));
+        assertEquals("block", season(turnedOn).get("inventoryMode"));
+        assertEquals("block", season(retrieved).get("inventoryMode"));
+        List<?> seasons = (List<?>) listed.get("seasons");
+        assertEquals(List.of("block", "per_hold"),
+                seasons.stream().map(item -> ((Map<?, ?>) item).get("inventoryMode")).toList());
+    }
+
+    @Test
+    void inventoryModeRefusalsAndBlockNotReadyCarryTheirCode() {
+        List<Map.Entry<Integer, String>> refusals = List.of(
+                Map.entry(409, "season_block_packages"), Map.entry(409, "season_block_on_sale"),
+                Map.entry(409, "season_not_draft_or_active"), Map.entry(409, "season_block_exists"),
+                Map.entry(422, "invalid_inventory_mode"));
+        List<SeatLayerHttpClient.Response> responses = new ArrayList<>();
+        for (Map.Entry<Integer, String> refusal : refusals) {
+            responses.add(new SeatLayerHttpClient.Response(refusal.getKey(),
+                    "{\"error\":\"" + refusal.getValue() + "\",\"code\":\"" + refusal.getValue() + "\"}", Map.of()));
+        }
+        responses.add(new SeatLayerHttpClient.Response(
+                409, "{\"error\":\"block_not_ready\",\"code\":\"block_not_ready\"}", Map.of()));
+        Seasons seasons = client(responses).seasons();
+
+        for (Map.Entry<Integer, String> refusal : refusals) {
+            SeatLayerException error = assertThrows(SeatLayerException.class, () -> seasons.updateSeason(
+                    "sea_1", Map.of("expectedRevision", 5, "inventoryMode", "block"), null));
+            assertEquals((int) refusal.getKey(), error.status());
+            assertEquals(refusal.getValue(), error.code());
+        }
+        SeatLayerConflictException notReady =
+                assertThrows(SeatLayerConflictException.class, () -> seasons.openSeasonSales("sea_1", 5));
+        assertEquals("block_not_ready", notReady.code());
+        assertEquals(refusals.size() + 1, calls.size());
+    }
+
+    private static SeatLayerHttpClient.Response ok(String body) {
+        return new SeatLayerHttpClient.Response(200, body, Map.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> season(Map<String, Object> answer) {
+        return (Map<String, Object>) answer.get("season");
+    }
+
+    @Test
     void renewalNoticesForOneOfferBatchSendItsBatchId() {
         SeatLayer sdk = client("{\"scheduled\":240,\"withoutEmail\":3}");
 
