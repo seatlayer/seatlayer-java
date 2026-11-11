@@ -18,7 +18,7 @@ final class SeasonTest {
     }
 
     @Test
-    void mapsAll87SeasonOperationsAndReplayClasses() {
+    void mapsAll90SeasonOperationsAndReplayClasses() {
         List<Call> calls = new ArrayList<>();
         SeatLayer sdk = SeatLayer.builder()
                 .secretKey("sk_test_abc")
@@ -130,8 +130,15 @@ final class SeasonTest {
                 "returnUrl", "https://tickets.example/renewed", "buyerEmail", "ana@example.com",
                 "buyerName", "Ana Silva", "provider", "stripe"), "renew-1");
         seasons.releaseSeasonLapsedOffers(key, "release-lapsed-1");
+        // Season seats: set aside, read, release (phase 4).
+        seasons.setAsideSeasonBlock(key, Map.of(
+                "expectedRevision", 7, "keepForSingleTickets", Map.of("labels", List.of("A-6"))), "block-1");
+        seasons.retrieveSeasonBlock(key);
+        seasons.releaseSeasonBlock(key, Map.of(
+                "expectedRevision", 7, "scope", Map.of("all", true), "eventKeys", List.of("ev/1"),
+                "at", "2026-12-01T10:00:00Z", "reason", "Unsold"), null);
 
-        assertEquals(87, calls.size());
+        assertEquals(90, calls.size());
         assertEquals("{}", holdersCsv);
         assertEquals("{}", ordersCsv);
         assertNull(calls.get(26).body());
@@ -208,7 +215,10 @@ final class SeasonTest {
                 "GET /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/quote",
                 "POST /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/intent",
                 "POST /v1/seasons/sea%2Fa/renewal-offers/offer%2F1/checkout",
-                "POST /v1/seasons/sea%2Fa/renewal-offers/release-lapsed");
+                "POST /v1/seasons/sea%2Fa/renewal-offers/release-lapsed",
+                "POST /v1/seasons/sea%2Fa/block",
+                "GET /v1/seasons/sea%2Fa/block",
+                "POST /v1/seasons/sea%2Fa/block/release");
         List<String> actual = calls.stream()
                 .map(call -> call.method() + " " + call.url().substring("https://api.seatlayer.io".length()))
                 .toList();
@@ -216,7 +226,7 @@ final class SeasonTest {
 
         List<Integer> replayIndexes = List.of(
                 2, 4, 5, 10, 18, 27, 29, 38,
-                48, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 66, 67, 68, 80, 85, 86);
+                48, 50, 51, 52, 53, 54, 55, 56, 58, 60, 61, 62, 66, 67, 68, 80, 85, 86, 87, 89);
         for (int index = 0; index < calls.size(); index++) {
             if (replayIndexes.contains(index)) {
                 assertTrue(calls.get(index).headers().containsKey("Idempotency-Key"));
@@ -230,6 +240,7 @@ final class SeasonTest {
         assertEquals("refund-date-1", calls.get(80).headers().get("Idempotency-Key"));
         assertEquals("renew-1", calls.get(85).headers().get("Idempotency-Key"));
         assertEquals("release-lapsed-1", calls.get(86).headers().get("Idempotency-Key"));
+        assertEquals("block-1", calls.get(87).headers().get("Idempotency-Key"));
 
         // JSON bodies of the 39 operations added after the first 48, in call order; null means no body.
         List<String> addedBodies = Arrays.asList(
@@ -274,8 +285,12 @@ final class SeasonTest {
                 null,
                 "{\"returnUrl\":\"https://tickets.example/renewed\",\"buyerEmail\":\"ana@example.com\","
                         + "\"buyerName\":\"Ana Silva\",\"provider\":\"stripe\"}",
-                null);
-        assertEquals(39, addedBodies.size());
+                null,
+                "{\"expectedRevision\":7,\"keepForSingleTickets\":{\"labels\":[\"A-6\"]}}",
+                null,
+                "{\"expectedRevision\":7,\"scope\":{\"all\":true},\"eventKeys\":[\"ev/1\"],"
+                        + "\"at\":\"2026-12-01T10:00:00Z\",\"reason\":\"Unsold\"}");
+        assertEquals(42, addedBodies.size());
         for (int offset = 0; offset < addedBodies.size(); offset++) {
             Call call = calls.get(48 + offset);
             String label = "call " + (48 + offset) + " " + expected.get(48 + offset);
@@ -335,6 +350,55 @@ final class SeasonTest {
         }
         assertTrue(calls.get(1).body().contains("\"returnCutoffHours\":null"));
         assertEquals("night-3-storm", calls.get(3).headers().get("Idempotency-Key"));
+    }
+
+    @Test
+    void seasonSeatsAnswersReachTheCaller() {
+        String pending = "{\"state\":\"finishing\",\"code\":\"block_date_leave_pending\",\"retryable\":true,"
+                + "\"eventKey\":\"ev_1\",\"shardsLeft\":[1],\"shardCount\":2,\"message\":\"Still leaving one shard\"}";
+        List<String> codes = List.of("season_block_not_enabled", "block_exists", "season_block_set_aside",
+                "season_inventory_locked", "date_leave_in_progress");
+        List<SeatLayerHttpClient.Response> responses = new ArrayList<>(List.of(
+                new SeatLayerHttpClient.Response(202, "{\"job\":{\"jobId\":\"sbsa_sbp_1\","
+                        + "\"kind\":\"season_block_set_aside\",\"state\":\"running\"},\"block\":{\"mode\":\"per_hold\"}}", Map.of()),
+                new SeatLayerHttpClient.Response(200, "{\"job\":{\"jobId\":\"sbr_1\","
+                        + "\"kind\":\"season_block_release\",\"state\":\"planning\"}}", Map.of()),
+                new SeatLayerHttpClient.Response(202, pending, Map.of("retry-after", "2")),
+                new SeatLayerHttpClient.Response(202, pending, Map.of())));
+        for (String code : codes) {
+            responses.add(new SeatLayerHttpClient.Response(
+                    409, "{\"error\":\"" + code + "\",\"code\":\"" + code + "\"}", Map.of()));
+        }
+        List<Call> calls = new ArrayList<>();
+        SeatLayer sdk = SeatLayer.builder()
+                .secretKey("sk_test_abc")
+                .transport((method, url, headers, requestBody) -> {
+                    calls.add(new Call(method, url, Map.copyOf(headers), requestBody));
+                    return responses.remove(0);
+                })
+                .build();
+        Seasons seasons = sdk.seasons();
+
+        Map<String, Object> setAside = seasons.setAsideSeasonBlock("sea_1", Map.of("expectedRevision", 7), null);
+        assertEquals("season_block_set_aside", ((Map<?, ?>) setAside.get("job")).get("kind"));
+        // Without a caller key one is generated, so a retry replays the same answer.
+        assertTrue(calls.get(0).headers().containsKey("Idempotency-Key"));
+        // A job of a kind this SDK did not know before reads as any other.
+        assertEquals("season_block_release",
+                ((Map<?, ?>) seasons.retrieveSeasonBulkJob("sea_1", "sbr_1").get("job")).get("kind"));
+        assertTrue(Seasons.isDateLeavePending(
+                seasons.createSeasonAmendment("sea_1", Map.of("eventKey", "ev_1", "kind", "cancel"), null)));
+        assertTrue(Seasons.isDateLeavePending(seasons.markSeasonPerformancePast("sea_1", "ev_1", Map.of(), null)));
+        assertTrue(!Seasons.isDateLeavePending(Map.of("amendment", Map.of("amendmentId", "am_1"))));
+        assertTrue(!Seasons.isDateLeavePending(Map.of("state", "finishing", "code", "season_busy")));
+        assertTrue(!Seasons.isDateLeavePending(Map.of("state", "done", "code", "block_date_leave_pending")));
+        assertTrue(!Seasons.isDateLeavePending(null));
+        for (String code : codes) {
+            SeatLayerConflictException error = assertThrows(SeatLayerConflictException.class, () -> seasons
+                    .releaseSeasonBlock("sea_1", Map.of("expectedRevision", 7, "scope", Map.of("labels", List.of("A-1"))), null));
+            assertEquals(code, error.code());
+        }
+        assertTrue(responses.isEmpty());
     }
 
     @Test

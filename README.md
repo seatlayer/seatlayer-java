@@ -141,6 +141,50 @@ seatlayer.holders().declineHolderRenewalOffer(
     "holder_123", offerId, Map.of("reason", "Moving away"));
 ```
 
+### Season seats
+
+Season seats are the seats a season sets aside on every date before its sales open. A season
+buyer's hold then doesn't have to ask each date, and single-ticket buyers see those seats as
+unavailable. They are off for every season until you send `"inventoryMode", "block"` to
+`createSeason` or `updateSeason`. The season needs one package, and its sales must not have opened.
+
+```java
+seatlayer.seasons().updateSeason(seasonKey,
+    Map.of("expectedRevision", revision, "inventoryMode", "block"), null);
+
+Map<String, Object> answer = seatlayer.seasons().setAsideSeasonBlock(seasonKey, Map.of(
+    "expectedRevision", revision,
+    "keepForSingleTickets", Map.of("sectionIds", List.of("sec_family"))), null);
+Map<?, ?> job = (Map<?, ?>) answer.get("job");
+while ("planning".equals(job.get("state")) || "running".equals(job.get("state"))) {
+    Thread.sleep(2000);
+    job = (Map<?, ?>) seatlayer.seasons()
+        .retrieveSeasonBulkJob(seasonKey, (String) job.get("jobId")).get("job");
+}
+Map<?, ?> block = (Map<?, ?>) seatlayer.seasons().retrieveSeasonBlock(seasonKey).get("block");
+
+// Release unsold season seats to single sale. Leave out "at" to release now.
+seatlayer.seasons().releaseSeasonBlock(seasonKey, Map.of(
+    "expectedRevision", block.get("revision"),
+    "scope", Map.of("all", true),
+    "at", "2026-12-01T09:00:00Z"), null);
+```
+
+- On an active season, block mode turns on by itself once every date has the seats, and
+  `season.block.ready` is sent once. On a draft, `publishSeason` turns it on.
+  `season.block.released` is sent once a release has run.
+- In block mode, a date cancel (`createSeasonAmendment`, kind `cancel`) or
+  `markSeasonPerformancePast` first takes the date off every season seat. Until that finishes the
+  answer is a `202`: check it with `Seasons.isDateLeavePending(answer)`, then send the same request
+  again after `Retry-After`.
+- Refusals come through `SeatLayerException` with `code()`, and nothing changes. For example
+  `409 season_block_packages` (more than one package), `409 season_block_on_sale` (sales have
+  opened), or `409 block_not_ready` from `openSeasonSales` before block mode is on.
+- A partner's seat on a date (one a sales channel sells there) stays out of the block. It is
+  listed in the block's `notFreeOnEveryDate` with reason `channel`.
+
+The [Season seats docs](https://docs.seatlayer.io/server-api/seasons/#season-seats) list every refusal.
+
 ## Orders, holders, event sales, and event series
 
 `orders()` reads orders across events and seasons and handles one event's
