@@ -522,6 +522,22 @@ class ClientTest {
         }
 
         @Test
+        @DisplayName("events filter by series")
+        void eventsFilterBySeries() {
+            SeatLayer sdk = client(List.of(Stub.of(200, "{\"events\":[]}"), Stub.of(200, "{\"events\":[]}")));
+            sdk.events().list(EventListOptions.builder().seriesKey("ser a/b").limit(10).build());
+            assertTrue(call(0).url().endsWith("/v1/events?limit=10&seriesKey=ser+a%2Fb"), call(0).url());
+            for (Map<String, Object> ignored
+                    : sdk.events().listAll(EventListOptions.builder().counts(false).seriesKey("ser_1").build())) {
+                // drain
+            }
+            assertTrue(call(1).url().contains("seriesKey=ser_1"), call(1).url());
+            assertEquals(
+                    new EventListOptions("ws_1", null, 5, null, true, null),
+                    new EventListOptions("ws_1", null, 5, null, true));
+        }
+
+        @Test
         @DisplayName("a single explicit page keeps counts")
         void singlePageKeepsCounts() {
             SeatLayer sdk = client(List.of(Stub.of(200, "{\"events\":[]}")));
