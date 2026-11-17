@@ -43,7 +43,7 @@ Benchmarked on public 100,000-, 150,000- and 200,000-seat venue fixtures on 15 S
 implementation 'io.seatlayer:seatlayer-java:0.9.0'
 ```
 
-Published on Maven Central as `io.seatlayer:seatlayer-java`; `0.9.0` is the current release, so no
+Published on Maven Central as `io.seatlayer:seatlayer-java`, so no
 extra repository declaration is needed. Requires Java 17 or newer. **Zero runtime dependencies**: the SDK uses
 `java.net.http.HttpClient` and `javax.crypto.Mac` from the JDK plus a small hand-written JSON
 codec, so it never forces a Jackson or OkHttp version on an application that already has one.
