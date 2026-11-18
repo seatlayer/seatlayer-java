@@ -55,6 +55,7 @@ codec, so it never forces a Jackson or OkHttp version on an application that alr
 ## Quick start
 
 ```java
+import io.seatlayer.EventHostingRegion;
 import io.seatlayer.SeatLayer;
 import java.util.Map;
 
@@ -424,19 +425,19 @@ support requests. All are unchecked, so they do not force `throws` clauses throu
 ## Reliability
 
 **Retries and idempotency.** Reads (`GET`/`HEAD`) retry connection failures, 408, 429 and 5xx with
-exponential backoff and full jitter; `Retry-After` wins when the server sends it. Forty-one
+exponential backoff and full jitter; `Retry-After` wins when the server sends it. Forty-three
 mutations use exact header replay:
 
 - `charts().create`, `charts().copy`, `templates().instantiateTemplate`, `events().create`,
   `workspaces().create`, and `performanceGroups().create`
-- 26 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
+- 28 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
   `updateSeasonPlan`, `deleteSeasonPlan`, `publishSeason`, `duplicateSeasonToLive`,
   `createSeasonHolderImport`, `createSeasonHolderImportFromSeason`, `createSeasonRenewalOffers`,
   `createSeasonAmendment`, `createSeasonPerformances`, `attachSeasonPerformances`,
   `deleteSeasonPerformance`, `markSeasonPerformancePast`, `createSeasonCheckoutTest`,
   `replaceSeasonPackagePrices`, `attachSeasonPlanPerformance`, `deleteSeasonPlanPerformance`,
   `refundSeasonOrder`, `cancelSeasonOrder`, `cancelSeasonOrderDate`, `refundSeasonPerformance`,
-  `releaseSeasonLapsedOffers`, and `createSeasonRenewalCheckout`
+  `releaseSeasonLapsedOffers`, `createSeasonRenewalCheckout`, `setAsideSeasonBlock`, and `releaseSeasonBlock`
 - `holders().updateHolder`, `holders().createHolderTransfer`, `holders().createHolderReturn`,
   `holders().createHolderRenewalCheckout`, `orders().refundEventOrder`, and
   `orders().cancelEventOrder`
@@ -520,19 +521,18 @@ free.
 Create a client with your secret key, read the buyer's hold with `inventory().retrieveHold(...)` to
 get the real seats and prices, take the payment, then call
 `inventory().book(eventKey, holdId, bookingRef)` with your own order id as `bookingRef`. For phone
-orders, the box office and comps, `inventory().bookBestAvailable(...)` picks and books the best
-seats in one call, with no browser involved. Keep that `bookingRef` for the order: it finds the
+orders, the box office and comps, `inventory().bookBestAvailable(...)` picks and books the best available seats in one call, with no browser involved. Keep that `bookingRef` for the order: it finds the
 booking again in `inventory().listBookings(...)` and cancels it with `inventory().unbook(...)`.
 
 ### How do I stop two buyers taking the same seat?
 
-In the SeatLayer picker, a buyer's seats are held when they go to checkout; with the bare chart,
-your code calls hold. The hold keeps those seats for that buyer for a set time, which you can change
-per event, and every other buyer sees them taken at once. Your server reads the hold with
+In the SeatLayer picker, a buyer's seats are held when they go to checkout; with the headless `SeatingChart`, your page calls `hold()`. The hold keeps those seats for that buyer for a set time, which you can change
+per event, and every other buyer sees them taken. Your server reads the hold with
 `inventory().retrieveHold(...)`, charges from the prices it returns rather than anything the browser
 sent, and books it; `inventory().extendHold(...)` gives a slow checkout more time without letting
-the seats go. If a booking call times out, send it again with the same hold and the same
-`bookingRef`: seats already booked under that reference are never sold twice.
+the seats go. If a booking call times out, check `inventory().listBookings(...)` for that `bookingRef`, or repeat the exact same
+booking with the same hold and `bookingRef`: seats already booked under it are not sold again,
+though the repeat can return an empty booked list.
 
 ### Can I use my own payment provider?
 
