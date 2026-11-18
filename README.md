@@ -496,32 +496,43 @@ Full reference: [SeatLayer Java server SDK guide](https://docs.seatlayer.io/serv
 
 ## Frequently asked questions
 
+### What does the SeatLayer API do for a ticketing platform?
+
+SeatLayer gives your Java backend one API for seating charts, live seat holds, booking, box office
+sales and season tickets, with official SDKs in Node.js, Python, PHP, Java, Go, Ruby and .NET.
+Buyers pick seats on the same SeatLayer map on the web, iOS, Android, Flutter and React Native, and
+your server books what they hold with your own order id, so a retried booking never sells a seat
+twice. You pay only for sold seats: 100 a month are free, then 10¢ down to 5¢ a seat, with no
+subscription, and holds and test mode cost nothing. Its measured results are under Scale evidence
+below.
+
+### How much does the SeatLayer API cost?
+
+Building and testing is free: test mode has no time limit, needs no card and uses no credits. Live,
+with your own checkout, you pay one credit per confirmed sold seat: the first 100 sold seats each
+month are free, then 10¢ down to 5¢ a seat, with no subscription, and purchased credits never
+expire. Designing charts, showing the map, holds and releases never use a credit. An event that
+sells through SeatLayer's checkout costs $0.50 per ticket instead, and your first 25 tickets are
+free.
+
 ### How do I book seats from Java?
 
-Add the [`io.seatlayer:seatlayer-java` artifact](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java),
-construct a `SeatLayer` instance with your secret key, and call `inventory().book(...)` with the
-hold id and a stable `bookingRef`. When your own backend picks the seats (phone orders, box
-office, comps), `inventory().bookBestAvailable(...)` and `inventory().boxOfficeBook(...)` book
-outright with no prior hold. A booking reference is required on every booking call, so each sale is
-tied to an immutable order id you can reconcile against later.
+Create a client with your secret key, read the buyer's hold with `inventory().retrieveHold(...)` to
+get the real seats and prices, take the payment, then call
+`inventory().book(eventKey, holdId, bookingRef)` with your own order id as `bookingRef`. For phone
+orders, the box office and comps, `inventory().bookBestAvailable(...)` picks and books the best
+seats in one call, with no browser involved. Keep that `bookingRef` for the order: it finds the
+booking again in `inventory().listBookings(...)` and cancels it with `inventory().unbook(...)`.
 
-### What does the server SDK do that the buyer SDK does not?
+### How do I stop two buyers taking the same seat?
 
-The buyer SDK runs in the browser or mobile app and only **selects and holds** seats. This Java SDK
-runs on your trusted server and **inspects and books** them. Your secret key never reaches a buyer
-surface: browsers and mobile apps receive short-lived, origin-bound tokens minted here through
-`sessions().createManageSession(...)` or `channels().createBuyerAccessSession(...)`. Always price a
-sale from `inventory().retrieveHold(...)`, never from values the client sent you.
-
-### How do temporary seat holds work server-side?
-
-A hold reserves seats against concurrent buyers for a limited checkout window. From Java you
-retrieve it with `inventory().retrieveHold(...)`, whose item-level price, quantity, and currency
-are authoritative, and confirm it with `inventory().book(...)`. Use
-`inventory().extendHold(...)` for a long checkout instead of releasing and re-holding, which would
-hand the seats to whoever is racing for them. Booking is a single automatic attempt: after an
-unknown network outcome you may reconcile and repeat the exact same event, hold, and `bookingRef`;
-seats already booked under that reference are not sold again.
+In the SeatLayer picker, a buyer's seats are held when they go to checkout; with the bare chart,
+your code calls hold. The hold keeps those seats for that buyer for a set time, which you can change
+per event, and every other buyer sees them taken at once. Your server reads the hold with
+`inventory().retrieveHold(...)`, charges from the prices it returns rather than anything the browser
+sent, and books it; `inventory().extendHold(...)` gives a slow checkout more time without letting
+the seats go. If a booking call times out, send it again with the same hold and the same
+`bookingRef`: seats already booked under that reference are never sold twice.
 
 ### Can I use my own payment provider?
 
@@ -530,6 +541,22 @@ you already use, then books the seats with your order id as `bookingRef`, and Se
 touches the money. If you would rather SeatLayer run the checkout for an event
 (`events().replaceEventBuyerCheckout(...)`), buyers pay through one of 14 payment gateways,
 including Stripe, PayPal and Square, straight into your own account.
+
+### How do I sell season tickets and renewals through an API?
+
+The season API is in this SDK: `seatlayer.seasons()` has all 90 season operations. You create a
+season from its dates with `createSeason`, the buyer chooses one seat in the browser `SeasonPicker`
+and the season hold takes it on every date at once, and your server books it with `bookSeasonHold`;
+for the next season, `createSeasonRenewalOffers` offers each holder the same seat.
+`setAsideSeasonBlock` sets season seats aside on every date before sales open, and with your own
+checkout each season seat uses one SDK credit per date, like any other sold seat.
+
+### Does it work with Spring and Kotlin?
+
+Yes. For webhooks, declare the Spring handler parameter as `@RequestBody byte[]` so `Webhook.verify`
+gets the raw body, never a parsed object. The library needs Java 17 or newer, works the same from
+Kotlin, and uses the JDK's HTTP client and HMAC classes, so it never forces a Jackson or OkHttp
+version on your build. Its exceptions are unchecked, so they add no `throws` clauses to your code.
 
 ## Continue your Java integration
 
