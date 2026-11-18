@@ -95,7 +95,7 @@ Use the typed `workspaces().create(name, region)` and
 The hint is best effort, not a data-residency guarantee. See the
 [full Event region guide](https://docs.seatlayer.io/server-api/event-regions/).
 
-## Fixed Renewable Seasons
+## Season tickets (Fixed Renewable Seasons)
 
 `seatlayer.seasons()` has all 90 season operations: seasons and their packages,
 dates and package prices (per price type, set with `priceTypeKey`: `adult`,
