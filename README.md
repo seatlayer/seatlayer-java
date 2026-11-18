@@ -8,6 +8,17 @@ SeatLayer's official SDK for Java and Kotlin brings seat booking, box office sal
 tickets to Spring and any other JVM backend on Java 17 and newer. It is built on the JDK's own HTTP
 client and HMAC classes, so it adds no Jackson, OkHttp or other runtime dependency to your build.
 
+## What SeatLayer is
+
+SeatLayer is reserved-seat ticketing and seating software: organizers sell with hosted checkout,
+a box office, door check-in and season tickets, and platforms add the same seat maps, with 3D
+seat views, through the SeatLayer SDK and API. One chart drives the 2D map, the 3D venue and the
+view from each seat (3D for venues up to 60,000 seats; the 2D map benchmarked at 200,000 seats).
+
+[Website](https://seatlayer.io/) · [For developers](https://seatlayer.io/developers/) ·
+[Season tickets](https://seatlayer.io/season-tickets/) · [Pricing](https://seatlayer.io/pricing/) ·
+[Live demo](https://seatlayer.io/demo/)
+
 [SeatLayer artifact on Maven Central](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java) ·
 [Java server SDK guide](https://docs.seatlayer.io/server-sdk/java/) ·
 [SeatLayer developer platform](https://seatlayer.io/developers/) ·
