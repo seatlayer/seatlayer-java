@@ -1,15 +1,23 @@
-# SeatLayer Java Server SDK for Reserved Seating
+# SeatLayer Java SDK: seat booking, reserved seating and season ticket API
 
 [![CI](https://github.com/seatlayer/seatlayer-java/actions/workflows/ci.yml/badge.svg)](https://github.com/seatlayer/seatlayer-java/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.seatlayer/seatlayer-java.svg)](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java)
 [![License: MIT](https://img.shields.io/badge/license-MIT-111827.svg)](LICENSE)
 
-The official Java client for the SeatLayer API. `io.seatlayer:seatlayer-java` lets a Java or Kotlin backend inspect seat holds, price orders from server data, book reserved seats and verify webhooks, with zero runtime dependencies. SeatLayer is seating chart and reserved-seat ticketing software built for venues up to stadium scale.
+SeatLayer's official SDK for Java and Kotlin brings seat booking, box office sales and season
+tickets to Spring and any other JVM backend on Java 17 and newer. It is built on the JDK's own HTTP
+client and HMAC classes, so it adds no Jackson, OkHttp or other runtime dependency to your build.
 
-SeatLayer's official Java server SDK is the **trusted side** of its reserved seating and seat
-booking API: inspect the holds a buyer created, price from server data, and book with a stable
-`bookingRef`. From Java or Kotlin you manage seating charts, events, sales channels, and live
-seat inventory through one typed ticketing API client.
+## What SeatLayer is
+
+SeatLayer is reserved-seat ticketing and seating software: organizers sell with hosted checkout,
+a box office, door check-in and season tickets, and platforms add the same seat maps, with 3D
+seat views, through the SeatLayer SDK and API. One chart drives the 2D map, the 3D venue and the
+view from each seat (3D for venues up to 60,000 seats; the 2D map benchmarked at 200,000 seats).
+
+[Website](https://seatlayer.io/) · [For developers](https://seatlayer.io/developers/) ·
+[Season tickets](https://seatlayer.io/season-tickets/) · [Pricing](https://seatlayer.io/pricing/) ·
+[Live demo](https://seatlayer.io/demo/)
 
 [SeatLayer artifact on Maven Central](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java) ·
 [Java server SDK guide](https://docs.seatlayer.io/server-sdk/java/) ·
@@ -24,10 +32,6 @@ seat inventory through one typed ticketing API client.
 **How it works:** the buyer picks and holds seats in your website or app with your public key. Your server then reads the hold, takes the payment through your own provider, and books the seats with this SDK and your secret key.
 
 **Start here:** [Quickstart](https://docs.seatlayer.io/start/quickstart/) · [Holds and checkout](https://docs.seatlayer.io/buyer-sdk/holds-and-checkout/) · [Java server SDK guide](https://docs.seatlayer.io/server-sdk/java/) · [SDK catalog](https://docs.seatlayer.io/sdk-catalog.json) · [Pricing](https://seatlayer.io/pricing/): 100 sold seats free every month, then 10¢ down to 5¢ per sold seat. No subscription, and purchased credits never expire. Test mode is free.
-
-## Scale evidence
-
-Benchmarked on public 100,000-, 150,000- and 200,000-seat venue fixtures on 15 September 2026: 200,000 seats chart-ready in 1.95 s, desktop, local production build. Tested at 10,000 simulated concurrent buyers on one 12,000-seat event (18 September 2026): engine-side hold latency p99 9 ms, zero server errors. Method, fixtures and run files: https://github.com/seatlayer/seatlayer-performance. Live 200,000-seat stadium demo: https://app.seatlayer.io/demo/play/century-stadium-200k.
 
 ## Install the Java and Kotlin seat booking SDK
 
@@ -51,6 +55,7 @@ codec, so it never forces a Jackson or OkHttp version on an application that alr
 ## Quick start
 
 ```java
+import io.seatlayer.EventHostingRegion;
 import io.seatlayer.SeatLayer;
 import java.util.Map;
 
@@ -91,7 +96,7 @@ Use the typed `workspaces().create(name, region)` and
 The hint is best effort, not a data-residency guarantee. See the
 [full Event region guide](https://docs.seatlayer.io/server-api/event-regions/).
 
-## Fixed Renewable Seasons
+## Season tickets (Fixed Renewable Seasons)
 
 `seatlayer.seasons()` has all 90 season operations: seasons and their packages,
 dates and package prices (per price type, set with `priceTypeKey`: `adult`,
@@ -420,19 +425,19 @@ support requests. All are unchecked, so they do not force `throws` clauses throu
 ## Reliability
 
 **Retries and idempotency.** Reads (`GET`/`HEAD`) retry connection failures, 408, 429 and 5xx with
-exponential backoff and full jitter; `Retry-After` wins when the server sends it. Forty-one
+exponential backoff and full jitter; `Retry-After` wins when the server sends it. Forty-three
 mutations use exact header replay:
 
 - `charts().create`, `charts().copy`, `templates().instantiateTemplate`, `events().create`,
   `workspaces().create`, and `performanceGroups().create`
-- 26 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
+- 28 on `seasons()`: `createSeason`, `updateSeason`, `deleteSeason`, `createSeasonPlan`,
   `updateSeasonPlan`, `deleteSeasonPlan`, `publishSeason`, `duplicateSeasonToLive`,
   `createSeasonHolderImport`, `createSeasonHolderImportFromSeason`, `createSeasonRenewalOffers`,
   `createSeasonAmendment`, `createSeasonPerformances`, `attachSeasonPerformances`,
   `deleteSeasonPerformance`, `markSeasonPerformancePast`, `createSeasonCheckoutTest`,
   `replaceSeasonPackagePrices`, `attachSeasonPlanPerformance`, `deleteSeasonPlanPerformance`,
   `refundSeasonOrder`, `cancelSeasonOrder`, `cancelSeasonOrderDate`, `refundSeasonPerformance`,
-  `releaseSeasonLapsedOffers`, and `createSeasonRenewalCheckout`
+  `releaseSeasonLapsedOffers`, `createSeasonRenewalCheckout`, `setAsideSeasonBlock`, and `releaseSeasonBlock`
 - `holders().updateHolder`, `holders().createHolderTransfer`, `holders().createHolderReturn`,
   `holders().createHolderRenewalCheckout`, `orders().refundEventOrder`, and
   `orders().cancelEventOrder`
@@ -492,32 +497,42 @@ Full reference: [SeatLayer Java server SDK guide](https://docs.seatlayer.io/serv
 
 ## Frequently asked questions
 
+### What does the SeatLayer API do for a ticketing platform?
+
+SeatLayer gives your Java backend one API for seating charts, live seat holds, booking, box office
+sales and season tickets, with official SDKs in Node.js, Python, PHP, Java, Go, Ruby and .NET.
+Buyers pick seats on the same SeatLayer map on the web, iOS, Android, Flutter and React Native, and
+your server books what they hold with your own order id, so a retried booking never sells a seat
+twice. You pay only for sold seats: 100 a month are free, then 10¢ down to 5¢ a seat, with no
+subscription, and holds and test mode cost nothing. Its measured results are under Scale evidence
+below.
+
+### How much does the SeatLayer API cost?
+
+Building and testing is free: test mode has no time limit, needs no card and uses no credits. Live,
+with your own checkout, you pay one credit per confirmed sold seat: the first 100 sold seats each
+month are free, then 10¢ down to 5¢ a seat, with no subscription, and purchased credits never
+expire. Designing charts, showing the map, holds and releases never use a credit. An event that
+sells through SeatLayer's checkout costs $0.50 per ticket instead, and your first 25 tickets are
+free.
+
 ### How do I book seats from Java?
 
-Add the [`io.seatlayer:seatlayer-java` artifact](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java),
-construct a `SeatLayer` instance with your secret key, and call `inventory().book(...)` with the
-hold id and a stable `bookingRef`. When your own backend picks the seats (phone orders, box
-office, comps), `inventory().bookBestAvailable(...)` and `inventory().boxOfficeBook(...)` book
-outright with no prior hold. A booking reference is required on every booking call, so each sale is
-tied to an immutable order id you can reconcile against later.
+Create a client with your secret key, read the buyer's hold with `inventory().retrieveHold(...)` to
+get the real seats and prices, take the payment, then call
+`inventory().book(eventKey, holdId, bookingRef)` with your own order id as `bookingRef`. For phone
+orders, the box office and comps, `inventory().bookBestAvailable(...)` picks and books the best available seats in one call, with no browser involved. Keep that `bookingRef` for the order: it finds the
+booking again in `inventory().listBookings(...)` and cancels it with `inventory().unbook(...)`.
 
-### What does the server SDK do that the buyer SDK does not?
+### How do I stop two buyers taking the same seat?
 
-The buyer SDK runs in the browser or mobile app and only **selects and holds** seats. This Java SDK
-runs on your trusted server and **inspects and books** them. Your secret key never reaches a buyer
-surface: browsers and mobile apps receive short-lived, origin-bound tokens minted here through
-`sessions().createManageSession(...)` or `channels().createBuyerAccessSession(...)`. Always price a
-sale from `inventory().retrieveHold(...)`, never from values the client sent you.
-
-### How do temporary seat holds work server-side?
-
-A hold reserves seats against concurrent buyers for a limited checkout window. From Java you
-retrieve it with `inventory().retrieveHold(...)`, whose item-level price, quantity, and currency
-are authoritative, and confirm it with `inventory().book(...)`. Use
-`inventory().extendHold(...)` for a long checkout instead of releasing and re-holding, which would
-hand the seats to whoever is racing for them. Booking is a single automatic attempt: after an
-unknown network outcome you may reconcile and repeat the exact same event, hold, and `bookingRef`;
-seats already booked under that reference are not sold again.
+In the SeatLayer picker, a buyer's seats are held when they go to checkout; with the headless `SeatingChart`, your page calls `hold()`. The hold keeps those seats for that buyer for a set time, which you can change
+per event, and every other buyer sees them taken. Your server reads the hold with
+`inventory().retrieveHold(...)`, charges from the prices it returns rather than anything the browser
+sent, and books it; `inventory().extendHold(...)` gives a slow checkout more time without letting
+the seats go. If a booking call times out, check `inventory().listBookings(...)` for that `bookingRef`, or repeat the exact same
+booking with the same hold and `bookingRef`: seats already booked under it are not sold again,
+though the repeat can return an empty booked list.
 
 ### Can I use my own payment provider?
 
@@ -526,6 +541,22 @@ you already use, then books the seats with your order id as `bookingRef`, and Se
 touches the money. If you would rather SeatLayer run the checkout for an event
 (`events().replaceEventBuyerCheckout(...)`), buyers pay through one of 14 payment gateways,
 including Stripe, PayPal and Square, straight into your own account.
+
+### How do I sell season tickets and renewals through an API?
+
+The season API is in this SDK: `seatlayer.seasons()` has all 90 season operations. You create a
+season from its dates with `createSeason`, the buyer chooses one seat in the browser `SeasonPicker`
+and the season hold takes it on every date at once, and your server books it with `bookSeasonHold`;
+for the next season, `createSeasonRenewalOffers` offers each holder the same seat.
+`setAsideSeasonBlock` sets season seats aside on every date before sales open, and with your own
+checkout each season seat uses one SDK credit per date, like any other sold seat.
+
+### Does it work with Spring and Kotlin?
+
+Yes. For webhooks, declare the Spring handler parameter as `@RequestBody byte[]` so `Webhook.verify`
+gets the raw body, never a parsed object. The library needs Java 17 or newer, works the same from
+Kotlin, and uses the JDK's HTTP client and HMAC classes, so it never forces a Jackson or OkHttp
+version on your build. Its exceptions are unchecked, so they add no `throws` clauses to your code.
 
 ## Continue your Java integration
 
@@ -543,6 +574,9 @@ including Stripe, PayPal and Square, straight into your own account.
   (`llms.txt`) for an agent-readable map of the documentation.
 - [Explore every SeatLayer SDK on GitHub](https://github.com/seatlayer)
   across web, mobile, and server.
+- [Season ticket API guide](https://seatlayer.io/guides/season-ticket-api/): build a season end to end.
+- [Box office](https://seatlayer.io/box-office/): sell at the counter from the same live seats.
+- [SDK and API overview](https://seatlayer.io/developers/) and [pricing](https://seatlayer.io/pricing/).
 
 ## SeatLayer SDK ecosystem
 
@@ -550,6 +584,8 @@ including Stripe, PayPal and Square, straight into your own account.
 |---|---|
 | JavaScript | [`@seatlayer/js`](https://www.npmjs.com/package/@seatlayer/js) |
 | React | [`@seatlayer/react`](https://www.npmjs.com/package/@seatlayer/react) |
+| Vue | [`@seatlayer/vue`](https://www.npmjs.com/package/@seatlayer/vue) |
+| Angular | [`@seatlayer/angular`](https://www.npmjs.com/package/@seatlayer/angular) |
 | React Native | [`@seatlayer/react-native`](https://www.npmjs.com/package/@seatlayer/react-native) |
 | iOS | [`seatlayer-ios`](https://github.com/seatlayer/seatlayer-ios) |
 | Flutter | [`seatlayer`](https://pub.dev/packages/seatlayer) |
@@ -562,6 +598,10 @@ including Stripe, PayPal and Square, straight into your own account.
 | .NET (server) | [`SeatLayer`](https://www.nuget.org/packages/SeatLayer) |
 | Java (server) | [`io.seatlayer:seatlayer-java`](https://central.sonatype.com/artifact/io.seatlayer/seatlayer-java) (this artifact) |
 | Go (server) | [`github.com/seatlayer/seatlayer-go`](https://pkg.go.dev/github.com/seatlayer/seatlayer-go) |
+
+## Scale evidence
+
+Benchmarked on public 100,000-, 150,000- and 200,000-seat venue fixtures on 15 September 2026: 200,000 seats chart-ready in 1.95 s, desktop, local production build. Tested at 10,000 simulated concurrent buyers on one 12,000-seat event (18 September 2026): engine-side hold latency p99 9 ms, zero server errors. Method, fixtures and run files: https://github.com/seatlayer/seatlayer-performance. Live 200,000-seat stadium demo: https://app.seatlayer.io/demo/play/century-stadium-200k.
 
 ## Development
 
